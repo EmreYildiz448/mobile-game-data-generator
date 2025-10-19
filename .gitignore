@@ -1,0 +1,30 @@
+# Bytecode / cache
+__pycache__/
+*.py[cod]
+
+# Virtual environments
+.venv/
+env/
+venv/
+
+# Jupyter notebooks checkpoints
+.ipynb_checkpoints/
+
+# Output
+output/
+
+# Ignore everything under data/
+data/**
+
+# But keep the external folder
+!data/external/
+
+# And keep the CSV file inside
+!data/external/exchange_rate.csv
+
+# OS junk
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
