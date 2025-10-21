@@ -73,7 +73,7 @@ class InGamePurchaseGenerator:
         current_balance = account_state.get(f"total_{cost_type}", 0)
         return current_balance >= cost_amount
 
-    def apply_purchase(self, account_state, offer, account_id, session_id, event_date, account_map_data, events, start_timestamp_fix):
+    def apply_purchase(self, account_state, offer, event_date, account_map_data, events, start_timestamp_fix, emit):
         """
         Apply the purchase by deducting resources, generating events for rewards, and injecting errors.
         """
@@ -81,12 +81,10 @@ class InGamePurchaseGenerator:
         cost_amount = offer["cost_amount"]
     
         # Generate sink_item event
-        sink_event = self.event_handler.write_event(
+        sink_event = emit(
             event_type="resource",
             event_subtype="sink_item",
             event_date=event_date,
-            account_id=account_id,
-            session_id=session_id,
             item_category="currency",
             item_id=offer["cost_type"],
             item_amount=cost_amount,
@@ -110,12 +108,10 @@ class InGamePurchaseGenerator:
                 reward_id = reward_id()  # Resolve callable reward IDs
     
             # Generate source_item event
-            source_event = self.event_handler.write_event(
+            source_event = emit(
                 event_type="resource",
                 event_subtype="source_item",
                 event_date=event_date + timedelta(seconds=1),
-                account_id=account_id,
-                session_id=session_id,
                 item_category=reward_category,
                 item_id=reward_id,
                 item_amount=reward_amount,
@@ -148,7 +144,7 @@ class InGamePurchaseGenerator:
     
         return purchase_events, False
 
-    def generate_in_game_purchase_event(self, account_id, session_id, base_timestamp, account_state, account_map_data, events, start_timestamp_fix):
+    def generate_in_game_purchase_event(self, base_timestamp, account_state, account_map_data, events, start_timestamp_fix, emit):
         """
         Generate an in-game purchase event, apply purchase logic, and handle error injection.
         """
@@ -157,7 +153,7 @@ class InGamePurchaseGenerator:
             return base_timestamp, [], False  # No offers available
 
         # Select a random eligible offer
-        offer_name, offer_data = random.choice(list(eligible_offers.items()))
+        _, offer_data = random.choice(list(eligible_offers.items()))
 
         # Final check for currency sufficiency
         cost_type = offer_data["cost_type"].replace("currency_", "")
@@ -166,14 +162,14 @@ class InGamePurchaseGenerator:
 
         # Apply the purchase
         purchase_events, terminate_session = self.apply_purchase(
-            account_state, offer_data, account_id, session_id, base_timestamp, account_map_data, events, start_timestamp_fix
+            account_state, offer_data, base_timestamp, account_map_data, events, start_timestamp_fix, emit
         )
         if terminate_session:
             return base_timestamp, [], True
 
         return base_timestamp + timedelta(seconds=random.randint(10, 30)), purchase_events, False
 
-    def combine_items(self, account_state, account_id, session_id, event_date, account_map_data, events, start_timestamp_fix):
+    def combine_items(self, account_state, event_date, account_map_data, events, start_timestamp_fix, emit):
         """
         Combine three identical items into one of a higher rarity level as long as the player has enough resources and valid items.
         """
@@ -193,15 +189,13 @@ class InGamePurchaseGenerator:
             )
     
         # === Helper: Apply currency sink for combination ===
-        def apply_combination_cost(account_state, event_date):
+        def apply_combination_cost(account_state, event_date, emit):
             events_created = []
             if cost["gold"] > 0:
-                sink_gold_event = self.event_handler.write_event(
+                sink_gold_event = emit(
                     event_type="resource",
                     event_subtype="sink_item",
                     event_date=event_date,
-                    account_id=account_id,
-                    session_id=session_id,
                     item_category="currency",
                     item_id="currency_gold",
                     item_amount=cost["gold"],
@@ -216,12 +210,10 @@ class InGamePurchaseGenerator:
                 account_state["total_gold"] -= cost["gold"]
     
             if cost["diamond"] > 0:
-                sink_diamond_event = self.event_handler.write_event(
+                sink_diamond_event = emit(
                     event_type="resource",
                     event_subtype="sink_item",
                     event_date=event_date,
-                    account_id=account_id,
-                    session_id=session_id,
                     item_category="currency",
                     item_id="currency_diamond",
                     item_amount=cost["diamond"],
@@ -285,19 +277,17 @@ class InGamePurchaseGenerator:
                 break  # Just in case
     
             # Step 5: Apply currency cost
-            currency_events, terminate = apply_combination_cost(account_state, event_date)
+            currency_events, terminate = apply_combination_cost(account_state, event_date, emit)
             if terminate:
                 return True, None
             events.extend(currency_events)
     
             # Step 6: Log sink_item for items
             event_date += timedelta(seconds=random.randint(1, 3))
-            sink_event = self.event_handler.write_event(
+            sink_event = emit(
                 event_type="resource",
                 event_subtype="sink_item",
                 event_date=event_date,
-                account_id=account_id,
-                session_id=session_id,
                 item_category=category,
                 item_id=item_id,
                 item_amount=3,
@@ -317,12 +307,10 @@ class InGamePurchaseGenerator:
     
             # Step 7: Log source_item for upgraded item
             event_date += timedelta(seconds=random.randint(1, 3))
-            source_event = self.event_handler.write_event(
+            source_event = emit(
                 event_type="resource",
                 event_subtype="source_item",
                 event_date=event_date,
-                account_id=account_id,
-                session_id=session_id,
                 item_category=category,
                 item_id=new_item_id,
                 item_amount=1,

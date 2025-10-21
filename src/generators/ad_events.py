@@ -37,7 +37,7 @@ class AdEventGenerator:
         else:
             self.ad_probability = min(1.0, self.ad_probability + R.AD_SHOW_PROBABILITY_INCREASE)
 
-    def create_ad_event(self, account_id, session_id, event_date, event_subtype, events, account_map_data, start_timestamp_fix, ad_data=None, **kwargs):
+    def create_ad_event(self, event_date, event_subtype, events, account_map_data, start_timestamp_fix, ad_data, emit, **kwargs):
         """
         Create a regular (non-rewarded) ad-related event.
         """
@@ -47,12 +47,10 @@ class AdEventGenerator:
         if not ad_data:
             return False  # No valid ad found
     
-        ad_event = self.event_handler.write_event(
+        ad_event = emit(
             event_type="ad",
             event_subtype=event_subtype,
             event_date=event_date,
-            account_id=account_id,
-            session_id=session_id,
             ad_id=ad_data["ad_id"],
             ad_length=ad_data.get("ad_length", R.DEFAULT_AD_LENGTH),
             **kwargs
@@ -64,17 +62,15 @@ class AdEventGenerator:
         
         return terminate_session
 
-    def create_reward_ad_event(self, account_id, session_id, event_date, reward_ad_probability, events, account_state, account_map_data, start_timestamp_fix):
+    def create_reward_ad_event(self, event_date, reward_ad_probability, events, account_state, account_map_data, start_timestamp_fix, emit):
         """
         Create reward ad events using only rewarded ads.
         """
         if account_state["is_subscribed"] == "premium":
-            reward_event = self.event_handler.write_event(
+            reward_event = emit(
                 event_type="resource",
                 event_subtype="source_item",
                 event_date=event_date + timedelta(seconds=1),  # No ad delay
-                account_id=account_id,
-                session_id=session_id,
                 item_category="currency",
                 item_id="currency_diamond",
                 item_amount=R.REWARD_DIAMOND_AMOUNT,
@@ -89,12 +85,10 @@ class AdEventGenerator:
             return terminate_session, 0  # No ad duration
         
         if random.random() > reward_ad_probability:
-            reward_ad_rejected_event = self.event_handler.write_event(
+            reward_ad_rejected_event = emit(
                 event_type="ad",
                 event_subtype="reward_ad_rejected",
                 event_date=event_date,
-                account_id=account_id,
-                session_id=session_id,
                 ad_id="None",
                 reward_category="currency",
                 reward_id="currency_diamond",
@@ -112,12 +106,10 @@ class AdEventGenerator:
         if not ad_data:
             return False, None  # No valid rewarded ad found
     
-        ad_shown_event = self.event_handler.write_event(
+        ad_shown_event = emit(
             event_type="ad",
             event_subtype="reward_ad_shown",
             event_date=event_date,
-            account_id=account_id,
-            session_id=session_id,
             ad_id=ad_data["ad_id"],
             reward_category="currency",
             reward_id="currency_diamond",
@@ -135,12 +127,10 @@ class AdEventGenerator:
             # Clamp the lower bound so randint never sees a min > max
             low = min(R.MIN_AD_WATCH_LENGTH, ad_length)
             watched_seconds = random.randint(low, ad_length)
-            ad_skipped_event = self.event_handler.write_event(
+            ad_skipped_event = emit(
                 event_type="ad",
                 event_subtype="reward_ad_skipped",
                 event_date=event_date + timedelta(seconds=watched_seconds),
-                account_id=account_id,
-                session_id=session_id,
                 ad_id=ad_data["ad_id"],
                 reward_category="currency",
                 reward_id="currency_diamond",
@@ -156,12 +146,10 @@ class AdEventGenerator:
             return terminate_session, watched_seconds
         
         else:  # Ad is completed
-            ad_completed_event = self.event_handler.write_event(
+            ad_completed_event = emit(
                 event_type="ad",
                 event_subtype="reward_ad_completed",
                 event_date=event_date + timedelta(seconds=ad_length),
-                account_id=account_id,
-                session_id=session_id,
                 ad_id=ad_data["ad_id"],
                 reward_category="currency",
                 reward_id="currency_diamond",
@@ -176,12 +164,10 @@ class AdEventGenerator:
             account_state["recent_engagement_event"] = True
     
             # Add reward to the account state
-            reward_event = self.event_handler.write_event(
+            reward_event = emit(
                 event_type="resource",
                 event_subtype="source_item",
                 event_date=event_date + timedelta(seconds=ad_length + 1),
-                account_id=account_id,
-                session_id=session_id,
                 item_category="currency",
                 item_id="currency_diamond",
                 item_amount=R.REWARD_DIAMOND_AMOUNT,

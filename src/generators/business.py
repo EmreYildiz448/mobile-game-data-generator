@@ -73,7 +73,7 @@ class BusinessEventGenerator:
     
         return random.choices(offer_names, weights=weights, k=1)[0]
 
-    def generate_business_event(self, account_id, session_id, event_date, archetype_data, events, account_state, account_map_data, start_timestamp_fix):
+    def generate_business_event(self, account_id, session_id, event_date, archetype_data, events, account_state, account_map_data, start_timestamp_fix, emit):
         """
         Generate a business event, apply rewards, and inject errors if applicable.
     
@@ -93,7 +93,7 @@ class BusinessEventGenerator:
         if account_id not in self.offer_refresh_dates:
             self.offer_refresh_dates[account_id] = {}
 
-        def calculate_monetization_probability(account_map_data, account_id, account_state):
+        def calculate_monetization_probability(account_map_data):
             """
             Calculate dynamic monetization probability for a specific account.
         
@@ -128,7 +128,7 @@ class BusinessEventGenerator:
             monetization_probability = base_probability + spending_factor # + currency_factor
             return min(monetization_probability, 1.0)
         
-        monetization_probability = calculate_monetization_probability(account_map_data, account_id, account_state)
+        monetization_probability = calculate_monetization_probability(account_map_data)
         monetization_check = random.random()
         if monetization_check > monetization_probability:
             return False, event_date  # No business event triggered
@@ -156,7 +156,6 @@ class BusinessEventGenerator:
         exchange_rate = account_map_data.get("exchange_rate", 1.0)
         market_multiplier = account_map_data.get("market_multiplier", 1.0)
         currency_rounding = account_map_data.get("currency_rounding", 2)
-        currency_name = account_map_data.get("currency_name", "USD")
         ab_monetization_effect = R.AB_MONETIZATION_EFFECT_TEST if account_map_data['app_version'] == R.AB_TEST_VERSION else R.AB_MONETIZATION_EFFECT_CONTROL
         
         # Apply both exchange rate and market-based adjustment
@@ -167,20 +166,16 @@ class BusinessEventGenerator:
 #        print("Monetization log:", self.analytics.monetization_by_archetype)
         
         # Generate business event
-        business_event = self.event_handler.write_event(
+        business_event = emit(
             event_type="business",
             event_subtype="business",
             event_date=event_date,
-            account_id=account_id,
-            session_id=session_id,
             offer_id=offer["offer_id"],
             reward_category=offer["item_category"],
             reward_id=[item() if callable(item) else item for item in offer["item_id"]],
             reward_amount=offer["item_amount"],
             cost_type=offer["cost_type"],
-            cost_amount=cost_amount,
-            currency_name=currency_name,
-            exchange_rate=exchange_rate
+            cost_amount=cost_amount
         )
         business_event, terminate_session = self.error_generator.attempt_event_replacement(
             business_event, account_map_data, events, start_timestamp_fix
@@ -203,12 +198,10 @@ class BusinessEventGenerator:
             ):
                 # Generate source item event for rewards
                 event_date += timedelta(seconds=1)
-                source_event = self.event_handler.write_event(
+                source_event = emit(
                     event_type="resource",
                     event_subtype="source_item",
                     event_date=event_date,
-                    account_id=account_id,
-                    session_id=session_id,
                     item_category=category,
                     item_id=reward_id,
                     item_amount=amount,

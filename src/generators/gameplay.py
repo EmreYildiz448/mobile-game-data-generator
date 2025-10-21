@@ -8,6 +8,7 @@ from src import catalogs as C
 from src.settings import runtime as R
 from src.event_handler import EventHandler
 from src.analytics import AnalyticsFramework
+from src.generators.chest_handler import ChestHandler
 from src.generators.errors import ErrorGenerator
 from src.generators.ad_events import AdEventGenerator
 from src.generators.business import BusinessEventGenerator
@@ -33,19 +34,23 @@ class EventGenerator:
         self.account_map_data = {account['account_id']: account for account in account_map_data}
         level_data_src = level_data if level_data is not None else C.level_data
         self.item_data = item_data if item_data is not None else C.item_data
-        self.level_data     = {k: v for k, v in level_data_src.items() if not k.startswith("TUTORIAL")}
+        self.level_data = {k: v for k, v in level_data_src.items() if not k.startswith("TUTORIAL")}
         self.tutorial_levels = {k: v for k, v in level_data_src.items() if     k.startswith("TUTORIAL")}
         self.shop_offers = shop_offers
         self.ad_campaigns = ad_campaigns
-        self.chest_handler = chest_handler
         self.error_data = error_data
         self.error_map = error_map
         self.item_success_contributions = C.item_success_contributions
         self.analytics = AnalyticsFramework(max_days=R.ANALYTICS_MAX_DATERANGE)  # Initialize the AnalyticsFramework
         self.error_generator = ErrorGenerator(self.error_data, self.error_map, self.event_handler)
-        self.ad_event_generator = AdEventGenerator(self.ad_campaigns, self.event_handler, self.error_generator, seed=seed)
-        self.business_event_generator = BusinessEventGenerator(self.shop_offers, self.chest_handler, self.event_handler, self.error_generator, self.analytics, seed=seed)
-        self.in_game_purchase_generator = InGamePurchaseGenerator(self.shop_offers, self.item_data, self.chest_handler, self.event_handler, self.error_generator, self.analytics)
+        self.chest_handler = ChestHandler(
+            self.item_data, self.event_handler, self.error_generator)
+        self.ad_event_generator = AdEventGenerator(
+            self.ad_campaigns, self.event_handler, self.error_generator, seed=seed)
+        self.business_event_generator = BusinessEventGenerator(
+            self.shop_offers, self.chest_handler, self.event_handler, self.error_generator, self.analytics, seed=seed)
+        self.in_game_purchase_generator = InGamePurchaseGenerator(
+            self.shop_offers, self.item_data, self.chest_handler, self.event_handler, self.error_generator, self.analytics, seed=seed)
         self.events = deque()
         self.account_states = {}
         self.equipped_items = {}  # Store equipped items for accounts
@@ -725,7 +730,17 @@ class EventGenerator:
         current_level = account_state["last_completed_level"] + 1 if account_state["last_completed_level"] else 1
         archetype_key = account_data_ext["archetype"]
         terminate_session = False  # Track if the session should terminate
-        
+        eh = self.event_handler  # local ref to avoid attribute lookups
+        emit = eh.make_emitter(
+            account_id=account_id,
+            session_id=session_id,
+            device_model=account_data_ext["device_model"],
+            os_version=account_data_ext["os_version"],
+            app_version=account_data_ext["app_version"],
+            currency_name=account_data_ext["currency_name"],
+            exchange_rate=account_data_ext["exchange_rate"],
+        )
+
         while current_level <= len(self.level_data):
             start_timestamp_fix = tutorial_timestamp if tutorial_timestamp else start_timestamp
             if terminate_session:
@@ -761,15 +776,10 @@ class EventGenerator:
 
             # Add user_login event if not initialized
             if not account_state.get("session_initialized", False):
-                user_login_event = self.event_handler.write_event(
+                user_login_event = emit(
                     event_type="authentication",
                     event_subtype="user_login",
                     event_date=base_timestamp,
-                    account_id=account_id,
-                    session_id=session_id,
-                    device_model=account_data_ext["device_model"],
-                    os_version=account_data_ext["os_version"],
-                    app_version=account_data_ext["app_version"],
                 )
                 self.events.append(user_login_event)
                 account_state["session_initialized"] = True
@@ -779,12 +789,10 @@ class EventGenerator:
             if account_data_ext["referred_friend"] and account_data_ext["referral_timestamp"] < base_timestamp:
                 ref_code = account_data_ext["referral_code"]
                 # Write the referral reward event
-                reward_event = self.event_handler.write_event(
+                reward_event = emit(
                     event_type="resource",
                     event_subtype="source_item",
                     event_date=base_timestamp,
-                    account_id=account_id,
-                    session_id=session_id,
                     item_category="chests",
                     item_id=R.REFERRAL_REWARD_CHEST_ID,
                     item_amount=1,
@@ -800,12 +808,10 @@ class EventGenerator:
             base_timestamp += timedelta(seconds=random.randint(1, 5))
             
             # Level Start Event
-            level_start_event = self.event_handler.write_event(
+            level_start_event = emit(
                 event_type="progression",
                 event_subtype="level_start",
                 event_date=base_timestamp,
-                account_id=account_id,
-                session_id=session_id,
                 level_id=level_key,
                 equipped_hero=equipped_hero,
                 equipped_skin=equipped_skin,
@@ -848,12 +854,10 @@ class EventGenerator:
                 base_timestamp += timedelta(seconds=time_spent)
             
                 # Level Success Event
-                level_success_event = self.event_handler.write_event(
+                level_success_event = emit(
                     event_type="progression",
                     event_subtype="level_success",
                     event_date=base_timestamp,
-                    account_id=account_id,
-                    session_id=session_id,
                     level_id=level_key,
                     equipped_hero=equipped_hero,
                     equipped_skin=equipped_skin,
@@ -891,12 +895,10 @@ class EventGenerator:
                 item_id = level_cfg["item_id"][0]
                 item_amount = level_cfg["item_amount"][0]
                 
-                reward_event = self.event_handler.write_event(
+                reward_event = emit(
                     event_type="resource",
                     event_subtype="source_item",
                     event_date=base_timestamp,
-                    account_id=account_id,
-                    session_id=session_id,
                     item_category=item_category,
                     item_id=item_id,
                     item_amount=item_amount,
@@ -931,15 +933,13 @@ class EventGenerator:
                     ad_data = self.ad_event_generator.select_ad()
                     ad_length = ad_data.get("ad_length", R.DEFAULT_AD_LENGTH)
                     terminate_session = self.ad_event_generator.create_ad_event(
-                        account_id=account_id,
-                        session_id=session_id,
                         event_date=base_timestamp,
                         event_subtype="ad_shown",
                         events=self.events,
-                        account_state=account_state,
                         account_map_data=account_data_ext,
                         start_timestamp_fix = start_timestamp_fix,
-                        ad_data=ad_data
+                        ad_data=ad_data,
+                        emit=emit
                     )
                     if terminate_session:
 #                        print(f"{account_id}: Session terminated after create ad_shown event at {base_timestamp}")
@@ -954,15 +954,13 @@ class EventGenerator:
                         low = min(R.MIN_AD_WATCH_LENGTH, ad_length)
                         watched_seconds = random.randint(low, ad_length)
                         terminate_session = self.ad_event_generator.create_ad_event(
-                            account_id=account_id,
-                            session_id=session_id,
                             event_date=base_timestamp + timedelta(seconds=watched_seconds),
                             event_subtype="ad_skipped",
                             events=self.events,
-                            account_state=account_state,
                             account_map_data=account_data_ext,
                             start_timestamp_fix = start_timestamp_fix,
                             ad_data=ad_data,
+                            emit=emit,
                             watched_seconds=watched_seconds,
                             remaining_seconds=ad_length - watched_seconds
                         )
@@ -978,15 +976,13 @@ class EventGenerator:
                     else:
                         # Generate the "ad_completed" event
                         terminate_session = self.ad_event_generator.create_ad_event(
-                            account_id=account_id,
-                            session_id=session_id,
                             event_date=base_timestamp + timedelta(seconds=ad_length),
                             event_subtype="ad_completed",
                             events=self.events,
-                            account_state=account_state,
                             account_map_data=account_data_ext,
                             start_timestamp_fix = start_timestamp_fix,
-                            ad_data=ad_data
+                            ad_data=ad_data,
+                            emit=emit
                         )
                         if terminate_session:
 #                            print(f"{account_id}: Session terminated after ad_completed event at {base_timestamp}")
@@ -1008,12 +1004,11 @@ class EventGenerator:
                 if available_chests:
                     terminate_session, base_timestamp = self.chest_handler.open_all_chests(
                         account_state=account_state,
-                        account_id=account_id,
-                        session_id=session_id,
                         event_date=base_timestamp,
                         account_map_data=account_data_ext,
                         events=self.events,
-                        start_timestamp_fix=start_timestamp_fix
+                        start_timestamp_fix=start_timestamp_fix,
+                        emit=emit
                     )
                     if terminate_session:  # Handle termination
 #                        print(f"{account_id}: Session terminated after open_chest (level_success cond) event at {base_timestamp}")
@@ -1038,12 +1033,10 @@ class EventGenerator:
 #                print(f"Total score= {total_score}, min score= {min_score}, max score= {max_score}, fail factor= {fail_factor}")
                 base_timestamp += timedelta(seconds=time_spent)
     
-                level_fail_event = self.event_handler.write_event(
+                level_fail_event = emit(
                     event_type="progression",
                     event_subtype="level_fail",
                     event_date=base_timestamp,
-                    account_id=account_id,
-                    session_id=session_id,
                     level_id=level_key,
                     equipped_hero=equipped_hero,
                     equipped_skin=equipped_skin,
@@ -1073,14 +1066,13 @@ class EventGenerator:
                     reward_ad_acceptance_probability = account_data_ext.get("reward_ad_acceptance_probability", 0.5)
                     # Generate reward ad events
                     terminate_session, ad_duration = self.ad_event_generator.create_reward_ad_event(
-                        account_id=account_id,
-                        session_id=session_id,
                         event_date=base_timestamp,
                         reward_ad_probability=reward_ad_acceptance_probability,
                         events=self.events,
                         account_state=account_state,
                         account_map_data=account_data_ext,
-                        start_timestamp_fix=start_timestamp_fix
+                        start_timestamp_fix=start_timestamp_fix,
+                        emit=emit
                     )
                     if terminate_session:  # If an error event requires session termination
 #                        print(f"{account_id}: Session terminated after reward_ad event at {base_timestamp}")
@@ -1103,7 +1095,8 @@ class EventGenerator:
                 events=self.events,
                 account_state=account_state,
                 account_map_data=account_data_ext,
-                start_timestamp_fix=start_timestamp_fix
+                start_timestamp_fix=start_timestamp_fix,
+                emit=emit
             )
             if terminate_session:
 #                print(f"{account_id}: Session terminated after business event at {base_timestamp}")
@@ -1114,7 +1107,7 @@ class EventGenerator:
                 
             base_timestamp += timedelta(seconds=random.randint(1, 5))
             terminate_session, base_timestamp = self.in_game_purchase_generator.combine_items(
-                account_state, account_id, session_id, base_timestamp, account_data_ext, self.events, start_timestamp_fix
+                account_state, base_timestamp, account_data_ext, self.events, start_timestamp_fix, emit
             )
             if terminate_session:  # Handle termination
 #                print(f"{account_id}: Session terminated after combine_item event at {base_timestamp}")
@@ -1128,7 +1121,7 @@ class EventGenerator:
             if random.random() < self.calculate_shop_activity_probability(account_id):
                 self.analytics.log_shop_activity(archetype_key)
                 base_timestamp, purchase_events, terminate_session = self.in_game_purchase_generator.generate_in_game_purchase_event(
-                    account_id, session_id, base_timestamp, account_state, account_data_ext, self.events, start_timestamp_fix
+                    base_timestamp, account_state, account_data_ext, self.events, start_timestamp_fix, emit
                 )
                 if terminate_session:
 #                    print(f"{account_id}: Session terminated after in_game_purchase event at {base_timestamp}")
@@ -1158,12 +1151,11 @@ class EventGenerator:
             if available_chests:
                 terminate_session, base_timestamp = self.chest_handler.open_all_chests(
                     account_state=account_state,
-                    account_id=account_id,
-                    session_id=session_id,
                     event_date=base_timestamp,
                     account_map_data=account_data_ext,
                     events=self.events,
-                    start_timestamp_fix=start_timestamp_fix
+                    start_timestamp_fix=start_timestamp_fix,
+                    emit=emit
                 )
                 if terminate_session:  # Handle termination
 #                    print(f"{account_id}: Session terminated after open_chest (level_fail cond) event at {base_timestamp}")
@@ -1178,16 +1170,11 @@ class EventGenerator:
 #                print(f"+ SESSION TERMINATION EVENT: Session ended for account {account_id} at level {current_level-1} (STP= {session_termination_probability}, Check= {stp_check}, Time= {base_timestamp}).")
                 self.update_final_account_state(account_id, account_state)
                 # Add user_logout event at the end of the session
-                user_logout_event = self.event_handler.write_event(
+                user_logout_event = emit(
                     event_type="authentication",
                     event_subtype="user_logout",
                     event_date=base_timestamp,
-                    account_id=account_id,
-                    session_id=session_id,
-                    device_model=account_data_ext["device_model"],
-                    os_version=account_data_ext["os_version"],
-                    app_version=account_data_ext["app_version"],
-                    session_duration=(base_timestamp - start_timestamp_fix).total_seconds(),
+                    session_duration=(base_timestamp - start_timestamp_fix).total_seconds()
                 )
 #                print(f"Base timestamp for {account_id} in session {session_id}: {base_timestamp}")
 #                print(f"Start timestamp for {account_id} in session {session_id}: {start_timestamp}")

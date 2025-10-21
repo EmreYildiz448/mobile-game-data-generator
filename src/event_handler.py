@@ -30,3 +30,23 @@ class EventHandler:
                 metadata_template[key] = value
 
         return metadata_template
+    
+    def make_emitter(self, **static_meta):
+        """
+        Return a fast callable that emits events with `static_meta`
+        merged into per-call metadata. Keeps construction centralized.
+        """
+        # strip Nones once; copy only at call
+        static_meta = {k: v for k, v in static_meta.items() if v is not None}
+
+        def emit(*, event_type: str, event_subtype: str, event_date, **meta):
+            # one shallow merge per event
+            event_meta = {**static_meta, **meta}
+            return self.write_event(
+                event_type=event_type,
+                event_subtype=event_subtype,
+                event_date=event_date,
+                **event_meta,
+            )
+
+        return emit

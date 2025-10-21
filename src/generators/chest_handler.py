@@ -10,7 +10,7 @@ class ChestHandler:
         self.event_handler = event_handler
         self.error_generator = error_generator
 
-    def open_chest(self, account_state, chest_id, account_id, session_id, event_date, account_map_data, events, start_timestamp_fix):
+    def open_chest(self, account_state, chest_id, event_date, account_map_data, events, start_timestamp_fix, emit):
         """
         Open a chest, grant a random item, and generate related events with error injection.
     
@@ -47,12 +47,10 @@ class ChestHandler:
             raise ValueError(f"Unexpected item type in chest reward: {item_type}")
     
         # Generate sink_item event
-        sink_event = self.event_handler.write_event(
+        sink_event = emit(
             event_type="resource",
             event_subtype="sink_item",
             event_date=event_date,
-            account_id=account_id,
-            session_id=session_id,
             item_category="chests",
             item_id=chest_id,
             item_amount=1,
@@ -72,12 +70,10 @@ class ChestHandler:
             event_date += timedelta(seconds=random.randint(1, 5))
     
         # Generate source_item event
-        source_event = self.event_handler.write_event(
+        source_event = emit(
             event_type="resource",
             event_subtype="source_item",
             event_date=event_date + timedelta(seconds=1),
-            account_id=account_id,
-            session_id=session_id,
             item_category=item_category,
             item_id=rewarded_item,
             item_amount=1,
@@ -99,7 +95,7 @@ class ChestHandler:
     
         return False, event_date
 
-    def open_all_chests(self, account_state, account_id, session_id, event_date, account_map_data, events, start_timestamp_fix):
+    def open_all_chests(self, account_state, event_date, account_map_data, events, start_timestamp_fix, emit):
         """
         Open all chests in the player's inventory until session termination or all chests are opened.
     
@@ -124,12 +120,11 @@ class ChestHandler:
                 terminate_session, event_date = self.open_chest(
                     account_state=account_state,
                     chest_id=chest_id,
-                    account_id=account_id,
-                    session_id=session_id,
                     event_date=event_date,
                     account_map_data=account_map_data,
                     events=events,
-                    start_timestamp_fix=start_timestamp_fix
+                    start_timestamp_fix=start_timestamp_fix,
+                    emit=emit
                 )
                 if terminate_session:
                     return True, event_date  # Immediately exit on session termination
