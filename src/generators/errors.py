@@ -18,7 +18,7 @@ class ErrorGenerator:
         """
         return random.random() < error_probability
 
-    def generate_error_event(self, event, account_map_data):
+    def generate_error_event(self, event, account_map_data, emit):
         """
         Generate an error event based on the replaced event's type and subtype.
         
@@ -34,7 +34,6 @@ class ErrorGenerator:
         event_date = event["event_date"]
         account_id = event["account_id"]
         session_id = event["session_id"]
-        metadata = event["event_metadata"]
 
         # Determine error type and subtype
         potential_errors = self.error_map.get(event_type, {}).get(event_subtype, [])
@@ -47,20 +46,15 @@ class ErrorGenerator:
         error_context = random.choice(error_metadata["error_context"])
 #        print(f"Event replaced with error: {account_id}/{event_type}/{event_subtype}/{metadata}")
         # Construct and return the error event
-        return self.event_handler.write_event(
+        return emit(
             event_type="error",
             event_subtype=error_subtype,
             event_date=event_date,
-            account_id=account_id,
-            session_id=session_id,
-            device_model=account_map_data["device_model"],
-            os_version=account_map_data["os_version"],
-            app_version=account_map_data["app_version"],
             error_id=error_id,
-            error_context=error_context,
+            error_context=error_context
         )
 
-    def attempt_event_replacement(self, event, account_map_data, events, start_timestamp_fix):
+    def attempt_event_replacement(self, event, account_map_data, events, start_timestamp_fix, emit):
         """
         Attempt to replace an event with an error event. Handle session termination if needed.
 
@@ -90,21 +84,16 @@ class ErrorGenerator:
             return event, False  # Return the original event and no session termination
 
         # Generate the error event
-        error_event = self.generate_error_event(event, account_map_data)
+        error_event = self.generate_error_event(event, account_map_data, emit)
         if not error_event:
             return event, False  # If no error was generated, return the original event
 
         # Check if the error type requires session termination
         if error_event["event_subtype"] in R.TERMINATING_ERROR_SUBTYPES:
-            user_logout_event = self.event_handler.write_event(
+            user_logout_event = emit(
                 event_type="authentication",
                 event_subtype="user_logout",
                 event_date=error_event["event_date"] + timedelta(seconds=1),
-                account_id=event["account_id"],
-                session_id=event["session_id"],
-                device_model=account_map_data["device_model"],
-                os_version=account_map_data["os_version"],
-                app_version=account_map_data["app_version"],
                 session_duration=((error_event["event_date"] + timedelta(seconds=1)) - start_timestamp_fix).total_seconds(),
             )
             # Append the error event

@@ -57,7 +57,7 @@ class ChestHandler:
             reason=f"{chest_id}_opened"
         )
         sink_event, terminate_session = self.error_generator.attempt_event_replacement(
-            sink_event, account_map_data, events, start_timestamp_fix
+            sink_event, account_map_data, events, start_timestamp_fix, emit
         )
         if terminate_session:
             return True, event_date # Terminate session if error occurs
@@ -80,7 +80,7 @@ class ChestHandler:
             reason=f"{chest_id}_opened"
         )
         source_event, terminate_session = self.error_generator.attempt_event_replacement(
-            source_event, account_map_data, events, start_timestamp_fix
+            source_event, account_map_data, events, start_timestamp_fix, emit
         )
         if terminate_session:
             return True, event_date # Terminate session if error occurs

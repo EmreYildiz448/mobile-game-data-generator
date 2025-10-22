@@ -91,7 +91,7 @@ class InGamePurchaseGenerator:
             reason=offer["offer_id"]
         )
         sink_event, terminate_session = self.error_generator.attempt_event_replacement(
-            sink_event, account_map_data, events, start_timestamp_fix
+            sink_event, account_map_data, events, start_timestamp_fix, emit
         )
         if terminate_session:
             return None, True
@@ -118,7 +118,7 @@ class InGamePurchaseGenerator:
                 reason=offer["offer_id"]
             )
             source_event, terminate_session = self.error_generator.attempt_event_replacement(
-                source_event, account_map_data, events, start_timestamp_fix
+                source_event, account_map_data, events, start_timestamp_fix, emit
             )
             if terminate_session:
                 return None, True
@@ -202,7 +202,7 @@ class InGamePurchaseGenerator:
                     reason="item_combination"
                 )
                 sink_gold_event, terminate = self.error_generator.attempt_event_replacement(
-                    sink_gold_event, account_map_data, events, start_timestamp_fix
+                    sink_gold_event, account_map_data, events, start_timestamp_fix, emit
                 )
                 if terminate:
                     return [], True
@@ -220,7 +220,7 @@ class InGamePurchaseGenerator:
                     reason="item_combination"
                 )
                 sink_diamond_event, terminate = self.error_generator.attempt_event_replacement(
-                    sink_diamond_event, account_map_data, events, start_timestamp_fix
+                    sink_diamond_event, account_map_data, events, start_timestamp_fix, emit
                 )
                 if terminate:
                     return [], True
@@ -294,7 +294,7 @@ class InGamePurchaseGenerator:
                 reason="item_combination"
             )
             sink_event, terminate = self.error_generator.attempt_event_replacement(
-                sink_event, account_map_data, events, start_timestamp_fix
+                sink_event, account_map_data, events, start_timestamp_fix, emit
             )
             if terminate:
                 return True, None
@@ -317,7 +317,7 @@ class InGamePurchaseGenerator:
                 reason="item_combination"
             )
             source_event, terminate = self.error_generator.attempt_event_replacement(
-                source_event, account_map_data, events, start_timestamp_fix
+                source_event, account_map_data, events, start_timestamp_fix, emit
             )
             if terminate:
                 return True, None

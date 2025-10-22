@@ -820,7 +820,7 @@ class EventGenerator:
                 equipped_armor=equipped_armor
             )
             level_start_event, terminate_session = self.error_generator.attempt_event_replacement(
-                level_start_event, account_data_ext, self.events, start_timestamp_fix
+                level_start_event, account_data_ext, self.events, start_timestamp_fix, emit
             )
             if terminate_session:
 #                print(f"{account_id}: Session terminated after level_start_event at {base_timestamp}")
@@ -869,7 +869,7 @@ class EventGenerator:
                     stars_gained=stars_gained
                 )
                 level_success_event, terminate_session = self.error_generator.attempt_event_replacement(
-                    level_success_event, account_data_ext, self.events, start_timestamp_fix
+                    level_success_event, account_data_ext, self.events, start_timestamp_fix, emit
                 )
                 base_timestamp += timedelta(seconds=1)
                 if terminate_session:
@@ -905,7 +905,7 @@ class EventGenerator:
                     reason=level_key
                 )
                 reward_event, terminate_session = self.error_generator.attempt_event_replacement(
-                    reward_event, account_data_ext, self.events, start_timestamp_fix
+                    reward_event, account_data_ext, self.events, start_timestamp_fix, emit
                 )
                 if terminate_session:
 #                    print(f"{account_id}: Session terminated after reward_event at {base_timestamp}")
@@ -1047,7 +1047,7 @@ class EventGenerator:
                     total_score=total_score
                 )
                 level_fail_event, terminate_session = self.error_generator.attempt_event_replacement(
-                    level_fail_event, account_data_ext, self.events, start_timestamp_fix
+                    level_fail_event, account_data_ext, self.events, start_timestamp_fix, emit
                 )
                 if terminate_session:
 #                    print(f"{account_id}: Session terminated after level_fail at {base_timestamp}")

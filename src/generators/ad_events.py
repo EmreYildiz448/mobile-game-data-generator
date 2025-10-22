@@ -55,7 +55,9 @@ class AdEventGenerator:
             ad_length=ad_data.get("ad_length", R.DEFAULT_AD_LENGTH),
             **kwargs
         )
-        ad_event, terminate_session = self.error_generator.attempt_event_replacement(ad_event, account_map_data, events, start_timestamp_fix)
+        ad_event, terminate_session = self.error_generator.attempt_event_replacement(
+            ad_event, account_map_data, events, start_timestamp_fix, emit
+        )
         
         if ad_event:
             events.append(ad_event)
@@ -77,7 +79,7 @@ class AdEventGenerator:
                 reason="premium_reward_ad"
             )
             reward_event, terminate_session = self.error_generator.attempt_event_replacement(
-                reward_event, account_map_data, events, start_timestamp_fix
+                reward_event, account_map_data, events, start_timestamp_fix, emit
             )
             if reward_event:
                 events.append(reward_event)
@@ -95,7 +97,7 @@ class AdEventGenerator:
                 reward_amount=R.REWARD_DIAMOND_AMOUNT
             )
             reward_ad_rejected_event, terminate_session = self.error_generator.attempt_event_replacement(
-                reward_ad_rejected_event, account_map_data, events, start_timestamp_fix
+                reward_ad_rejected_event, account_map_data, events, start_timestamp_fix, emit
             )
             if reward_ad_rejected_event:
                 events.append(reward_ad_rejected_event)
@@ -116,7 +118,7 @@ class AdEventGenerator:
             reward_amount=R.REWARD_DIAMOND_AMOUNT
         )
         ad_shown_event, terminate_session = self.error_generator.attempt_event_replacement(
-            ad_shown_event, account_map_data, events, start_timestamp_fix
+            ad_shown_event, account_map_data, events, start_timestamp_fix, emit
         )
         if terminate_session:
             return True, None
@@ -139,7 +141,7 @@ class AdEventGenerator:
                 remaining_seconds=ad_length - watched_seconds
             )
             ad_skipped_event, terminate_session = self.error_generator.attempt_event_replacement(
-                ad_skipped_event, account_map_data, events, start_timestamp_fix
+                ad_skipped_event, account_map_data, events, start_timestamp_fix, emit
             )
             if ad_skipped_event:
                 events.append(ad_skipped_event)
@@ -156,7 +158,7 @@ class AdEventGenerator:
                 reward_amount=R.REWARD_DIAMOND_AMOUNT
             )
             ad_completed_event, terminate_session = self.error_generator.attempt_event_replacement(
-                ad_completed_event, account_map_data, events, start_timestamp_fix
+                ad_completed_event, account_map_data, events, start_timestamp_fix, emit
             )
             if terminate_session:
                 return True, None
@@ -174,7 +176,7 @@ class AdEventGenerator:
                 reason="reward_ad_completed"
             )
             reward_event, terminate_session = self.error_generator.attempt_event_replacement(
-                reward_event, account_map_data, events, start_timestamp_fix
+                reward_event, account_map_data, events, start_timestamp_fix, emit
             )
             if reward_event:
                 events.append(reward_event)

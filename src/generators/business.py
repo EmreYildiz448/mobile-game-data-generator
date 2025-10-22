@@ -178,7 +178,7 @@ class BusinessEventGenerator:
             cost_amount=cost_amount
         )
         business_event, terminate_session = self.error_generator.attempt_event_replacement(
-            business_event, account_map_data, events, start_timestamp_fix
+            business_event, account_map_data, events, start_timestamp_fix, emit
         )
         if terminate_session:
             return True, None  # Session terminated due to an error
