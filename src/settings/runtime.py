@@ -50,9 +50,13 @@ def _dt_from_env(name, default_iso):
     return datetime.fromisoformat(src)
 
 SEED           = _i("SEED", 24)                         # SEED
-NUM_ACCOUNTS   = _i("NUM_ACC", 1000)                    # total_accounts
+NUM_ACCOUNTS   = _i("NUM_ACC", 10000)                   # total_accounts
 NUM_ADS        = _i("NUM_ADS", 20)                      # num_ads
 NUM_CAMPAIGNS  = _i("NUM_CAMPAIGNS", 10)                # num_campaigns
+
+# How many worker processes to use for event generation.
+# Clamp to available CPU cores in main() — this default just avoids oversubscription if unset.
+NUM_WORKERS = _i("NUM_WORKERS", 8)
 
 START_DATE     = _dt_from_env("START_DATE", "2024-12-31")  # start_date
 END_DATE       = _dt_from_env("END_DATE",   "2025-03-31")  # end_date

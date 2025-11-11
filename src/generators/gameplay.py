@@ -15,7 +15,12 @@ from src.generators.business import BusinessEventGenerator
 from src.generators.ig_purchases import InGamePurchaseGenerator
 
 class EventGenerator:
-    def __init__(self, account_map_data=None, level_data=None, item_data=None, shop_offers=None, ad_campaigns=None, chest_handler=None, error_data=None, error_map=None, seed=None):
+    def __init__(self, account_map_data=None, 
+                 level_data=None, item_data=None, 
+                 shop_offers=None, ad_campaigns=None, 
+                 chest_handler=None, error_data=None, 
+                 error_map=None, seed=None, 
+                 worker_id=None):
         if account_map_data is None:
             raise ValueError("account_map_data must be provided.")
         if ad_campaigns is None:
@@ -26,6 +31,8 @@ class EventGenerator:
         self.seed = seed
         if seed is not None:
             random.seed(seed)
+
+        self.worker_id = worker_id
 
         self.ab_assignment_device_counter = defaultdict(lambda: {'total': 0, 'test': defaultdict(int)})
         self.processed_ab_accounts = set()
@@ -1385,7 +1392,8 @@ class EventGenerator:
             # Print only if completion percentage is a multiple of 10 and hasn't been printed before
             if completion_percentage % 10 == 0 and completion_percentage != last_printed_percent:
                 current_time = datetime.now().strftime("%H:%M")
-                print(f"Events: {completion_percentage}% complete at {current_time}")
+                prefix = f"Core {self.worker_id}: " if self.worker_id else ""
+                print(f"{prefix}Events: {completion_percentage}% complete at {current_time}")
                 last_printed_percent = completion_percentage
     
         # Assign session IDs after all events are generated
@@ -1419,7 +1427,8 @@ class EventGenerator:
     
             if completion_percentage % 10 == 0 and completion_percentage != last_printed_percent:
                 current_time = datetime.now().strftime("%H:%M")
-                print(f"Sessions: {completion_percentage}% complete at {current_time}")
+                prefix = f"Core {self.worker_id}: " if self.worker_id else ""
+                print(f"{prefix}Sessions: {completion_percentage}% complete at {current_time}")
                 last_printed_percent = completion_percentage
     
             session_id = event.get("session_id")
