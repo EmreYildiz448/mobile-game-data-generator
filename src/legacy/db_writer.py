@@ -19,7 +19,7 @@ def _ensure_session():
     if _session is not None:
         return _session
 
-    from src.settings.infra import DATABASE_URL
+    from src.settings.infra import DATABASE_URL # Uncomment and change to your actual import path
 
     _engine = create_engine(DATABASE_URL, echo=False)
     _Session = sessionmaker(bind=_engine)
