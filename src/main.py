@@ -50,11 +50,11 @@ from src.generators.errors import ErrorGenerator
 from src.generators.gameplay import EventGenerator
 from src.marketing.ad_generator import AdCampaignGenerator
 from src.marketing.hosted_ads import HostedAdGenerator, HostedAdInteractionGenerator
-from src.io.db_writer import insert_data
+# from src.io.db_writer import insert_data
 from src.io.file_writer import write_tables
 from src.database.bootstrap import bootstrap_bronze
 from src.database.transform_layers import transform_layer
-from src.models.orm import Account, Session, Event, HostedAdCampaign, HostedAdInteraction, Advertisement, Campaign, AdCampaignMapping
+# from src.models.orm import Account, Session, Event, HostedAdCampaign, HostedAdInteraction, Advertisement, Campaign, AdCampaignMapping
 from src.analysis.ab_test import run_ab_tests
 from src.analysis.ml_models import run_ml_suite
 
