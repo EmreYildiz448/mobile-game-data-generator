@@ -3,8 +3,10 @@ from __future__ import annotations
 
 from pathlib import Path
 import duckdb
+import pandas as pd
 
 from src.settings import runtime as R
+from src.io.file_writer import _normalize_objects
 
 
 def open_or_create_db(db_path: Path) -> duckdb.DuckDBPyConnection:
@@ -74,6 +76,50 @@ def load_csv_dir(
 
         print(f"[bronze] Loaded: {csv_path.name} -> {schema}.{table}")
         created.append(table)
+
+    return created
+
+def load_frames_dir(
+    con: duckdb.DuckDBPyConnection,
+    schema: str,
+    tables: dict[str, pd.DataFrame],
+    mode: str = "replace",
+) -> list[str]:
+    """
+    Load in-memory pandas DataFrames into <schema>.<table_name>.
+
+    Mirrors load_csv_dir but operates on DataFrames instead of CSVs.
+    Applies the same normalization as CSV writer to keep schemas aligned.
+    """
+    created: list[str] = []
+
+    for name, df in tables.items():
+        df_norm = _normalize_objects(df)  # same cleanup as CSV path
+
+        tmp_view = f"tmp_{schema}_{name}"
+        con.register(tmp_view, df_norm)
+
+        if mode == "replace":
+            con.execute(
+                f"CREATE OR REPLACE TABLE {schema}.{name} AS SELECT * FROM {tmp_view}"
+            )
+        elif mode == "append":
+            con.execute(
+                f"""
+                CREATE TABLE IF NOT EXISTS {schema}.{name} AS
+                SELECT * FROM {tmp_view} LIMIT 0
+                """
+            )
+            con.execute(
+                f"INSERT INTO {schema}.{name} SELECT * FROM {tmp_view}"
+            )
+        else:
+            con.unregister(tmp_view)
+            raise ValueError("mode must be 'replace' or 'append'")
+
+        con.unregister(tmp_view)
+        print(f"[bronze] Loaded in-memory DataFrame -> {schema}.{name}")
+        created.append(name)
 
     return created
 
@@ -149,27 +195,34 @@ def bootstrap_bronze(
     data_dir: Path | None = None,
     schema: str = "bronze",
     mode: str = "replace",
+    tables: dict[str, pd.DataFrame] | None = None,  # NEW
 ) -> None:
     """
     Orchestrate bronze initialization end-to-end:
       1) open/create DB
       2) ensure schema
-      3) load CSVs from data_dir (defaults to R.DATA_INT_DIR)
-      4) run bronze health checks
-      5) print a quick sample
+      3) load main data (from CSVs or in-memory DataFrames)
+      4) load reference CSVs
+      5) run bronze health checks
+      6) print a quick sample
     """
     if data_dir is None:
         data_dir = R.DATA_INT_DIR
 
     print(f"[bronze] db_path: {db_path}")
     print(f"[bronze] data_dir: {data_dir}")
+    if tables is not None:
+        print(f"[bronze] loading from in-memory DataFrames (tables={list(tables.keys())})")
 
     con = open_or_create_db(Path(db_path))
     try:
         ensure_schema(con, schema)
 
-        # Load main data (accounts, events, etc.)
-        created = load_csv_dir(con, schema, Path(data_dir), mode=mode)
+        # Load main data: either from in-memory tables or from CSVs
+        if tables is not None:
+            created = load_frames_dir(con, schema, tables, mode=mode)
+        else:
+            created = load_csv_dir(con, schema, Path(data_dir), mode=mode)
 
         # Load prepackaged reference data (e.g., exchange_rate.csv)
         ext_dir = R.DATA_EXT_DIR

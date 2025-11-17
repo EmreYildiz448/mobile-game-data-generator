@@ -211,45 +211,68 @@ def main():
 #        insert_data(AdCampaignMapping, mappings)
 #    else:
 #        print("Skipping database inserts.")
+
+    df_accounts = pd.DataFrame(accounts)
+    df_events = pd.DataFrame(events)
+    df_sessions = pd.DataFrame(sessions)
+    df_hosted_ads = pd.DataFrame(hosted_ads)
+    df_hosted_ad_interactions = pd.DataFrame(full_interactions)
+    df_ads = pd.DataFrame(ads)
+    df_campaigns = pd.DataFrame(campaigns)
+    df_ad_campaign_map = pd.DataFrame(mappings)
+
+    tables = {
+        "accounts": df_accounts,
+        "events": df_events,
+        "sessions": df_sessions,
+        "hosted_ads": df_hosted_ads,
+        "hosted_ad_interactions": df_hosted_ad_interactions,
+        "ads": df_ads,
+        "campaigns": df_campaigns,
+        "ad_campaign_map": df_ad_campaign_map,
+    }
+
     if R.WRITE_TO_FILE:
         print("Writing data files")
-        df_accounts = pd.DataFrame(accounts)
-        df_events = pd.DataFrame(events)
-        df_sessions = pd.DataFrame(sessions)
-        df_hosted_ads = pd.DataFrame(hosted_ads)
-        df_hosted_ad_interaction = pd.DataFrame(full_interactions)
-        df_ads = pd.DataFrame(ads)
-        df_campaigns = pd.DataFrame(campaigns)
-        df_ad_campaign_map = pd.DataFrame(mappings)
         write_tables(
-            {"accounts": df_accounts, "events": df_events, "sessions": df_sessions,
-             "hosted_ads": df_hosted_ads, "hosted_ad_interactions": df_hosted_ad_interaction,
-             "ads": df_ads, "campaigns": df_campaigns, "ad_campaign_map": df_ad_campaign_map},
+            tables,
             out_dir=R.DATA_INT_DIR,
             fmt=R.OUTPUT_FORMAT,
             sample_rows=R.SAMPLE_ROWS,
         )
         print(f"Files written to: {R.DATA_INT_DIR}")
-        print(df_accounts.head())
-        print(df_events.head())
-        print(df_sessions.head())
-        print(df_hosted_ads.head())
-        print(df_hosted_ad_interaction.head())
-        print(df_ads.head())
-        print(df_campaigns.head())
-        print(df_ad_campaign_map.head())
     else:
         print("Skipping file write.")
+
     if R.WRITE_TO_DUCK:
         print("Creating DuckDB file")
-        bootstrap_bronze(R.DUCKDB_PATH, data_dir=R.DATA_INT_DIR, schema="bronze", mode="replace")
+        if R.WRITE_TO_FILE:
+            # CSV-based path (existing behavior)
+            bootstrap_bronze(
+                R.DUCKDB_PATH,
+                data_dir=R.DATA_INT_DIR,
+                schema="bronze",
+                mode="replace",
+            )
+        else:
+            # In-memory path: skip CSVs, use DataFrames
+            bootstrap_bronze(
+                R.DUCKDB_PATH,
+                data_dir=None,
+                schema="bronze",
+                mode="replace",
+                tables=tables,
+            )
+
         transform_layer(R.DUCKDB_PATH, R.SQL_SLV_DIR, "silver")
         transform_layer(R.DUCKDB_PATH, R.SQL_GLD_DIR, "gold")
         transform_layer(R.DUCKDB_PATH, R.SQL_ANLYT_DIR, "analytics")
+
     if R.EXEC_STAT_TESTS:
         run_ab_tests(R.DUCKDB_PATH, R.REPORT_AB_DIR)
     if R.EXEC_ML_TESTS:
         run_ml_suite(R.DUCKDB_PATH, R.REPORT_ML_DIR, None)
+    print("Done")
 
 if __name__ == "__main__":
     try:

@@ -17,9 +17,7 @@ from sklearn.linear_model import LinearRegression
 from xgboost import XGBClassifier, XGBRegressor
 import shap
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Data prep (reads from DuckDB analytics.equipment_contribution_eda)
-# ──────────────────────────────────────────────────────────────────────────────
+
 def _load_equipment_contribution_eda(db_path: Path) -> pd.DataFrame:
     con = duckdb.connect(str(db_path))
     try:
@@ -181,9 +179,7 @@ def preprocess_data(db_path: Path, target_type: str) -> pd.DataFrame:
 
     return df.copy()
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Model runner
-# ──────────────────────────────────────────────────────────────────────────────
+
 def run_model(model_cls, target_column, df, *,
               is_classifier=True, residual_mode=False, drop_cols=None,
               model_name="Model", model_library="sklearn",
@@ -234,8 +230,8 @@ def run_model(model_cls, target_column, df, *,
         importances.append(getattr(model, "feature_importances_", np.zeros(X.shape[1])))
 
     avg_imp = pd.Series(np.mean(importances, axis=0), index=X.columns)
-    print(f"[{model_name}] Average {'Accuracy' if is_classifier else 'R²'}: {np.mean(scores):.4f}")
-    print(f"[{model_name}] Top features:\n{avg_imp.sort_values(ascending=False).head(10)}\n")
+#    print(f"[{model_name}] Average {'Accuracy' if is_classifier else 'R²'}: {np.mean(scores):.4f}")
+#    print(f"[{model_name}] Top features:\n{avg_imp.sort_values(ascending=False).head(10)}\n")
 
     score_mean = float(np.mean(scores))
     avg_imp_sorted = avg_imp.sort_values(ascending=False)
