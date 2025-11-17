@@ -200,17 +200,17 @@ def main():
     full_interactions = ad_interaction_generator.generate_all_interactions()
     current_time = datetime.now().strftime("%H:%M")
     print(f"Hosted ad interactions generation ends at {current_time}")
-    if R.WRITE_TO_DB:
-        insert_data(Account, accounts)
-        insert_data(Session, list(sessions))
-        insert_data(Event, list(events))
-        insert_data(HostedAdCampaign, hosted_ads)
-        insert_data(HostedAdInteraction, full_interactions)
-        insert_data(Advertisement, ads)
-        insert_data(Campaign, campaigns)
-        insert_data(AdCampaignMapping, mappings)
-    else:
-        print("Skipping database inserts.")
+#    if R.WRITE_TO_DB:
+#        insert_data(Account, accounts)
+#        insert_data(Session, list(sessions))
+#        insert_data(Event, list(events))
+#        insert_data(HostedAdCampaign, hosted_ads)
+#        insert_data(HostedAdInteraction, full_interactions)
+#        insert_data(Advertisement, ads)
+#        insert_data(Campaign, campaigns)
+#        insert_data(AdCampaignMapping, mappings)
+#    else:
+#        print("Skipping database inserts.")
     if R.WRITE_TO_FILE:
         print("Writing data files")
         df_accounts = pd.DataFrame(accounts)
