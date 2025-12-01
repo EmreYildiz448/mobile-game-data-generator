@@ -10,4 +10,4 @@ The following modifications are necessary to use legacy scripts and push data to
 2-) db_writer.py imports database credentials from infra.py, which is currently a placeholder. Replace the placeholder with your server credentials.
 3-) In main.py, uncomment the block of code that starts with "if R.WRITE_TO_DB:"
 4-) When executing the program via main.py, include WRITE_TO_DB environment variable as True:
-- $env:WRITE_TO_DB = "false"
+- $env:WRITE_TO_DB = "false" in terminal or WRITE_TO_DB=False in the .env file
