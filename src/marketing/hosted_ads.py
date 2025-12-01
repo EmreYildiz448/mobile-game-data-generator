@@ -3,6 +3,8 @@ import math
 import pandas as pd
 from datetime import datetime, timedelta
 
+from src.settings import runtime as R
+
 class HostedAdGenerator:
     def __init__(self, seed=None):
         """
@@ -47,8 +49,8 @@ class HostedAdGenerator:
             "CPA": (5.00, 15.00),
         }
 
-        self.start_date = datetime(2025, 1, 1)
-        self.end_date = datetime(2025, 12, 31)  # All ads end within this timeframe
+        self.start_date = R.START_DATE
+        self.end_date = R.START_DATE + timedelta(days=365)  # All ads end within this timeframe
 
     def generate_value_per_action(self, pricing_model):
         """

@@ -28,3 +28,6 @@ Thumbs.db
 
 # Editor
 .vscode/
+
+# Environment variables file
+.env

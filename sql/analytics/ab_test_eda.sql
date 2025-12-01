@@ -3,13 +3,13 @@ CREATE TABLE analytics.ab_test_eda AS
          SELECT sessions.session_id,
             sessions.account_id,
                 CASE
-                    WHEN ((sessions.app_version)::text = '1.0.0.b'::text) THEN 'test'::text
-                    WHEN ((sessions.app_version)::text = '1.0.0.a'::text) THEN 'control'::text
+                    WHEN ((sessions.app_version)::text = '{AB_TEST_VERSION}'::text) THEN 'test'::text
+                    WHEN ((sessions.app_version)::text = '{CONTROL_VERSION}'::text) THEN 'control'::text
                     ELSE NULL::text
                 END AS group_type,
             (sessions.session_start)::date AS session_date
            FROM bronze.sessions
-          WHERE (sessions.session_start >= '2025-03-03'::date)
+          WHERE (sessions.session_start >= '{AB_START}'::date)
         ), base_events AS (
          SELECT e.session_id,
             e.event_type,

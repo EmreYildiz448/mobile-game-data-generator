@@ -1,8 +1,10 @@
 from datetime import datetime, timedelta
 import random
 
+from src.settings import runtime as R
+
 class AdCampaignGenerator:
-    def __init__(self, num_ads=50, num_campaigns=20, total_accounts=1000, seed=None, config=None):
+    def __init__(self, num_ads, num_campaigns, total_accounts, seed=None, config=None):
         """Initialize ad campaign generator using the new ad_config_data structure."""
         if seed:
             random.seed(seed)
@@ -68,7 +70,7 @@ class AdCampaignGenerator:
 
     def create_campaign(self, campaign_id, advertiser, campaign_type):
         """Create a campaign with randomized start & end dates."""
-        start_date = datetime(2025, 1, 1) + timedelta(days=(random.randint(0, 5) * 7)) if "Search" not in advertiser else datetime(2025, 1, 1)
+        start_date = R.START_DATE + timedelta(days=(random.randint(0, 5) * 7)) if "Search" not in advertiser else R.START_DATE
         end_date = start_date + timedelta(days=90)
         return {
             "campaign_id": campaign_id,
@@ -167,7 +169,7 @@ class AdCampaignGenerator:
     def update_ads_with_campaign_data(self):
         """Assign pricing models from campaigns to ads and apply engagement effects, 
         factoring in a **linear** ad duration multiplier for the adjusted min-max range (54-90 days)."""
-        current_date = datetime(2025, 4, 1)  # Assume simulation ends here
+        current_date = R.END_DATE
         min_days = 54  # Minimum campaign duration
         max_days = 90  # Maximum campaign duration
     

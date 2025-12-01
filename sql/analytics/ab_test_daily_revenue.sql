@@ -5,13 +5,13 @@ CREATE TABLE analytics.ab_test_daily_revenue AS
 			account_id,
 			session_start,
 			CASE 
-				WHEN app_version = '1.0.0.b' THEN 'test'
-				WHEN app_version = '1.0.0.a' THEN 'control'
+				WHEN app_version = '{AB_TEST_VERSION}' THEN 'test'
+				WHEN app_version = '{CONTROL_VERSION}' THEN 'control'
 				ELSE NULL
 			END AS group_type,
 			session_start::DATE AS session_date
 		FROM bronze.sessions
-		WHERE session_start >= DATE '2025-03-03'
+		WHERE session_start >= DATE '{AB_START}'
 	),
 	base_events AS (
 		SELECT

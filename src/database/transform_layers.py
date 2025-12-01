@@ -7,6 +7,8 @@ import sys
 import duckdb
 import sqlglot as sg
 
+from src.settings import runtime as R
+
 CREATE_TARGET_RE = re.compile(
     r"CREATE\s+(?:OR\s+REPLACE\s+)?TABLE\s+([A-Za-z_][A-Za-z0-9_\.\"$]*)",
     re.IGNORECASE,
@@ -63,8 +65,26 @@ def transform_layer(db_path: Path, sql_dir: Path, target_schema: str) -> None:
             print(f"— applying: {path.name}")
             raw_sql = path.read_text(encoding="utf-8")
 
+            mapping = {
+                # Simulation window
+                "START_DATE": R.START_DATE.date().isoformat(),
+                "END_DATE": R.END_DATE.date().isoformat(),
+
+                # A/B test core dates (from AB_START / AB_END in .env via runtime)
+                "AB_START": R.AB_TEST_LAUNCH_DATE.date().isoformat(),
+                "AB_END": R.AB_TEST_END_DATE.date().isoformat(),
+
+                # Fully-formed versions used in SQL (control/test)
+                "CONTROL_VERSION": R.CONTROL_VERSION,
+                "AB_TEST_VERSION": R.AB_TEST_VERSION,
+            }
+            sql = raw_sql
+            for key, value in mapping.items():
+                placeholder = "{" + key + "}"
+                sql = sql.replace(placeholder, str(value))
+                
             # Minimal prepass + transpile (DuckDB→DuckDB split)
-            s = _strip_tails(raw_sql)
+            s = _strip_tails(sql)
             try:
                 stmts = _transpile_duckdb(s)
             except Exception as e:

@@ -2,6 +2,102 @@ import os
 from datetime import datetime, timedelta
 from pathlib import Path
 
+from dotenv import load_dotenv, dotenv_values
+
+def _prevalidate_env(path: str | None = None) -> bool:
+    """
+    Read .env as simple key-value pairs, validate critical relationships.
+    If invalid, return False so we can skip load_dotenv() and use defaults.
+    """
+    env_dict = dotenv_values(dotenv_path=path)  # defaults to ".env" if None
+
+    if not env_dict:
+        # No .env file or it's empty → nothing to validate
+        return True
+
+    errors: list[str] = []
+
+    def _parse_iso(key: str):
+        v = env_dict.get(key)
+        if v is None:
+            return None
+        try:
+            return datetime.fromisoformat(v)
+        except Exception:
+            errors.append(f"{key} must be ISO date (YYYY-MM-DD). Got {v!r}.")
+            return None
+        
+    def _parse_int(key: str):
+        v = env_dict.get(key)
+        if v is None:
+            return None
+        try:
+            return int(v)
+        except Exception:
+            errors.append(f"{key} must be an integer. Got {v!r}.")
+            return None
+        
+    # Check START_DATE <= END_DATE if both provided in .env
+    start = _parse_iso("START_DATE")
+    end = _parse_iso("END_DATE")
+    if start and end and start > end:
+        errors.append(
+            f"START_DATE ({start.date()}) cannot be later than END_DATE ({end.date()})."
+        )
+
+    # Check AB_START <= AB_END if both provided
+    ab_start = _parse_iso("AB_START")
+    ab_end = _parse_iso("AB_END")
+    if ab_start and ab_end and ab_start > ab_end:
+        errors.append(
+            f"AB_START ({ab_start.date()}) cannot be later than AB_END ({ab_end.date()})."
+        )
+
+    for int_key in ["NUM_ACC", "NUM_ADS", "NUM_CAMPAIGNS", "NUM_WORKERS"]:
+        val = _parse_int(int_key)
+        if val is not None and val == 0:
+            errors.append(f"{int_key} cannot be 0. Provided: {val}")
+
+    # If any errors, print them and reject .env
+    if errors:
+        print("[runtime] Ignoring .env due to configuration errors:")
+        for msg in errors:
+            print("  -", msg)
+    # Clear stale shell variables
+        for key in env_dict.keys():
+            os.environ.pop(key, None)
+        return False
+
+    return True
+
+def _apply_env_with_validation(path: str | None = None) -> None:
+    """
+    Run .env validation & loading at most once per OS process.
+
+    Child worker processes spawned by ProcessPoolExecutor will inherit
+    os.environ from the parent, so they don't need to re-run validation.
+    """
+    # If this flag is set, we've already done validation in this process
+    if os.getenv("TC_ENV_VALIDATED") == "1":
+        return
+
+    # Validate .env
+    if _prevalidate_env(path):
+        # Safe to load .env into os.environ
+        load_dotenv(dotenv_path=path)
+        # you could optionally print a debug line here if you want
+    # else: .env is ignored; defaults remain in effect
+
+    # Mark as validated so subsequent imports (and child-process imports)
+    # in this process won't re-run validation.
+    os.environ["TC_ENV_VALIDATED"] = "1"
+
+
+# Apply env once when runtime.py is first imported in this process
+_apply_env_with_validation()
+
+
+
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DATA_DIR = PROJECT_ROOT / "data"
 DATA_EXT_DIR = DATA_DIR / "external"
@@ -49,8 +145,8 @@ def _dt_from_env(name, default_iso):
     # fromisoformat handles 'YYYY-MM-DD' and 'YYYY-MM-DDTHH:MM:SS'
     return datetime.fromisoformat(src)
 
-SEED           = _i("SEED", 24)                         # SEED
-NUM_ACCOUNTS   = _i("NUM_ACC", 10000)                   # total_accounts
+SEED           = _i("SEED", 42)                         # SEED
+NUM_ACCOUNTS   = _i("NUM_ACC", 1000)                    # total_accounts
 NUM_ADS        = _i("NUM_ADS", 20)                      # num_ads
 NUM_CAMPAIGNS  = _i("NUM_CAMPAIGNS", 10)                # num_campaigns
 

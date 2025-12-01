@@ -35,8 +35,8 @@ CREATE TABLE silver.accounts_extended AS
                     ELSE 'unknown'::text
                 END AS engagement_segment,
                 CASE
-                    WHEN (('2025-03-31 00:00:00+03'::timestamp with time zone - ws.week_start_date) >= '28 days'::interval) THEN 'churned'::text
-                    WHEN (('2025-03-31 00:00:00+03'::timestamp with time zone - ws.week_start_date) >= '14 days'::interval) THEN 'dormant'::text
+                    WHEN (('{END_DATE} 23:59:59+03'::timestamp with time zone - ws.week_start_date) >= '28 days'::interval) THEN 'churned'::text
+                    WHEN (('{END_DATE} 23:59:59+03'::timestamp with time zone - ws.week_start_date) >= '14 days'::interval) THEN 'dormant'::text
                     ELSE 'active'::text
                 END AS churn_segment
            FROM (weekly_aggregated_sessions ws
@@ -302,7 +302,7 @@ diamond_json AS (
     p.first_purchase_date,
     p.last_purchase_date,
     COALESCE(m7.monetized_within_7_days, false) AS monetized_within_7_days,
-    ('2025-04-01'::date - p.last_purchase_date) AS purchase_recency_days,
+    ('{END_DATE}'::date - p.last_purchase_date) AS purchase_recency_days,
     p.number_of_purchases,
     p.most_purchased_item,
     p.total_purchase,
@@ -326,8 +326,8 @@ diamond_json AS (
     s.churn_segment,
     s.completion_segment,
         CASE
-            WHEN ((p.last_sub_date + 30) >= '2025-04-01'::date) THEN 'active'::text
-            WHEN ((p.last_sub_date + 30) < '2025-04-01'::date) THEN 'inactive'::text
+            WHEN ((p.last_sub_date + 30) >= '{END_DATE}'::date) THEN 'active'::text
+            WHEN ((p.last_sub_date + 30) < '{END_DATE}'::date) THEN 'inactive'::text
             ELSE 'never'::text
         END AS subscription_status,
     p.subscription_purchases,

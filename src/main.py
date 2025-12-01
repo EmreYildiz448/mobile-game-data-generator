@@ -166,7 +166,7 @@ def main():
             item_data=item_data,
             shop_offers=shop_offers,
             ad_campaigns=hosted_ads,
-            chest_handler=_ch,   # now a real ChestHandler object
+            chest_handler=_ch,
             error_data=error_data,
             error_map=error_map,
             seed=R.SEED,
@@ -185,6 +185,7 @@ def main():
             seen_accounts.add(acct)
 
         # Session-id assignment + session generation
+        print(f"All events generated for a total of {len(central_eg.events)} event rows")
         central_eg.assign_session_ids()
         events = list(central_eg.get_events())
         sessions = central_eg.generate_sessions()

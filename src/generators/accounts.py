@@ -15,7 +15,7 @@ class AccountProbabilityAssigner:
         Initialize the AccountProbabilityAssigner with player archetypes.
         """
         self.archetypes = archetypes
-        if seed:
+        if seed is not None:
             random.seed(seed)
 
     def assign_archetype(self):
@@ -46,7 +46,7 @@ class AccountsGenerator:
         self.seed = seed
         self.faker = Faker()
 
-        if seed:
+        if seed is not None:
             random.seed(seed)
             np.random.seed(seed) 
             self.faker.seed_instance(seed)
