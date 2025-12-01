@@ -6,13 +6,10 @@ from datetime import datetime, timedelta
 from src.settings import runtime as R
 
 class HostedAdGenerator:
-    def __init__(self, seed=None):
+    def __init__(self):
         """
-        Initialize the generator with an optional seed for reproducibility.
+        Initialize the generator.
         """
-        if seed is not None:
-            random.seed(seed)
-        self.seed = seed
 
         # Ad Networks
         self.ad_networks = ["Google AdMob", "Unity Ads", "Meta Audience Network", "ironSource", "AppLovin"]

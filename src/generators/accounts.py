@@ -8,15 +8,15 @@ from faker import Faker
 from src.settings import runtime as R
 from src import catalogs as C
 
+def deterministic_uuid(seed: int, index: int) -> uuid.UUID:
+    return uuid.uuid5(uuid.NAMESPACE_DNS, f"{seed}-{index}")
 
 class AccountProbabilityAssigner:
-    def __init__(self, archetypes, seed=None):
+    def __init__(self, archetypes):
         """
         Initialize the AccountProbabilityAssigner with player archetypes.
         """
         self.archetypes = archetypes
-        if seed is not None:
-            random.seed(seed)
 
     def assign_archetype(self):
         """
@@ -41,14 +41,12 @@ class AccountsGenerator:
         self.start_date = start_date
         self.end_date = end_date
         self.total_accounts = total_accounts
-        self.probability_assigner = AccountProbabilityAssigner(archetypes, seed)
+        self.probability_assigner = AccountProbabilityAssigner(archetypes)
         self.ad_install_data = ad_install_data  # Store ad_install_data for later use
         self.seed = seed
         self.faker = Faker()
 
         if seed is not None:
-            random.seed(seed)
-            np.random.seed(seed) 
             self.faker.seed_instance(seed)
 
         self.remaining_installs = {ad["ad_name"]: ad["install_count"] for ad in ad_install_data}
@@ -359,9 +357,12 @@ class AccountsGenerator:
             f"user{random.randint(1000, 9999)}@example.com" if email_is_anonymized else self.faker.email()
         )
         
+        account_index = len(self.generated_accounts)
+        account_id = deterministic_uuid(self.seed, account_index)
+
         # Step 1: Generate Basic Account Data
         account_data = {
-            'account_id': uuid.uuid4(),
+            'account_id': account_id,
             'username': self.faker.user_name(),
             'email': email,
             'email_is_anonymized': email_is_anonymized,

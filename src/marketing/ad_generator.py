@@ -4,10 +4,8 @@ import random
 from src.settings import runtime as R
 
 class AdCampaignGenerator:
-    def __init__(self, num_ads, num_campaigns, total_accounts, seed=None, config=None):
+    def __init__(self, num_ads, num_campaigns, total_accounts, config=None):
         """Initialize ad campaign generator using the new ad_config_data structure."""
-        if seed:
-            random.seed(seed)
 
         self.config = config  # Store unified config
         self.num_ads = num_ads

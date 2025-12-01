@@ -3,7 +3,7 @@ from datetime import timedelta
 from src.settings import runtime as R
 
 class AdEventGenerator:
-    def __init__(self, ad_campaigns, event_handler, error_generator, seed=None):
+    def __init__(self, ad_campaigns, event_handler, error_generator):
         """
         Initialize the AdEventGenerator.
         """
@@ -16,9 +16,6 @@ class AdEventGenerator:
         self.event_handler = event_handler
         self.error_generator = error_generator
         self.ad_probability = R.AD_SHOW_PROBABILITY  # Initial ad probability
-        self.seed = seed
-        if seed is not None:
-            random.seed(seed)
         
 
     def select_ad(self, rewarded=False):

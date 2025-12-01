@@ -19,18 +19,13 @@ class EventGenerator:
                  level_data=None, item_data=None, 
                  shop_offers=None, ad_campaigns=None, 
                  chest_handler=None, error_data=None, 
-                 error_map=None, seed=None, 
-                 worker_id=None):
+                 error_map=None, worker_id=None):
         if account_map_data is None:
             raise ValueError("account_map_data must be provided.")
         if ad_campaigns is None:
             raise ValueError("ad_campaigns must be provided.")
         if chest_handler is None:
             raise ValueError("chest_handler must be provided.")
-
-        self.seed = seed
-        if seed is not None:
-            random.seed(seed)
 
         self.worker_id = worker_id
 
@@ -53,11 +48,11 @@ class EventGenerator:
         self.chest_handler = ChestHandler(
             self.item_data, self.event_handler, self.error_generator)
         self.ad_event_generator = AdEventGenerator(
-            self.ad_campaigns, self.event_handler, self.error_generator, seed=seed)
+            self.ad_campaigns, self.event_handler, self.error_generator)
         self.business_event_generator = BusinessEventGenerator(
-            self.shop_offers, self.chest_handler, self.event_handler, self.error_generator, self.analytics, seed=seed)
+            self.shop_offers, self.chest_handler, self.event_handler, self.error_generator, self.analytics)
         self.in_game_purchase_generator = InGamePurchaseGenerator(
-            self.shop_offers, self.item_data, self.chest_handler, self.event_handler, self.error_generator, self.analytics, seed=seed)
+            self.shop_offers, self.item_data, self.chest_handler, self.event_handler, self.error_generator, self.analytics)
         self.events = deque()
         self.account_states = {}
         self.equipped_items = {}  # Store equipped items for accounts

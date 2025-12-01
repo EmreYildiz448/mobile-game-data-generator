@@ -4,6 +4,8 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 from collections import deque
 import os
 import multiprocessing as mp
+import random
+import numpy as np
 
 def chunkify(lst, n):
     k, m = divmod(len(lst), n)
@@ -11,6 +13,12 @@ def chunkify(lst, n):
 
 def _worker_generate_events(chunk_accounts, worker_seed, hosted_ads, worker_id=None):
     # Import catalogs INSIDE the child process to avoid pickling lambdas
+    import random
+    import numpy as np
+
+    random.seed(worker_seed)
+    np.random.seed(worker_seed)
+
     from src.catalogs import (
         level_data as _level_data, item_data as _item_data, shop_offers as _shop_offers,
         error_data as _error_data, error_map as _error_map, event_master_dict as _event_master_dict
@@ -34,7 +42,6 @@ def _worker_generate_events(chunk_accounts, worker_seed, hosted_ads, worker_id=N
         chest_handler=_ch,
         error_data=_error_data,
         error_map=_error_map,
-        seed=worker_seed,
         worker_id=worker_id
     )
     events, summaries = eg.generate_all_events()
@@ -59,12 +66,13 @@ from src.analysis.ab_test import run_ab_tests
 from src.analysis.ml_models import run_ml_suite
 
 def main():
-    print(datetime.now())
+    random.seed(R.SEED)
+    np.random.seed(R.SEED)
+
     ad_campaign_generator = AdCampaignGenerator(
         num_ads=R.NUM_ADS,
         num_campaigns=R.NUM_CAMPAIGNS,
         total_accounts=R.NUM_ACCOUNTS,
-        seed=R.SEED,
         config=ad_config_data
     )
     ads = ad_campaign_generator.ads
@@ -95,7 +103,7 @@ def main():
     accounts, account_map_data = accounts_generator.generate_accounts()
     print(f"All accounts generated for a total of {len(accounts)} account rows")
     print(accounts[0])
-    ad_generator = HostedAdGenerator(seed=R.SEED)
+    ad_generator = HostedAdGenerator()
     hosted_ads = ad_generator.generate_all()
     # Prepare shared inputs for workers. Workers will create their own
     # EventGenerator instances to avoid pickling complex objects.
@@ -128,8 +136,7 @@ def main():
             ad_campaigns=hosted_ads,
             chest_handler=chest_handler,
             error_data=error_data,
-            error_map=error_map,
-            seed=R.SEED,
+            error_map=error_map
         )
         events, _ = event_generator.generate_all_events() # _ -> summaries
         print(f"All events generated for a total of {len(events)} event rows")
@@ -153,7 +160,7 @@ def main():
             merged_final_states.extend(final_states)
 
         # Sort by event_date once
-        merged_events = sorted(merged_events, key=lambda e: e["event_date"])
+        merged_events = sorted(merged_events, key=lambda e: (e["event_date"], e["session_id"]))
 
         _eh  = EventHandler(event_master_dict)
         _err = ErrorGenerator(error_data=error_data, error_map=error_map, event_handler=_eh)
@@ -168,8 +175,7 @@ def main():
             ad_campaigns=hosted_ads,
             chest_handler=_ch,
             error_data=error_data,
-            error_map=error_map,
-            seed=R.SEED,
+            error_map=error_map
         )
         central_eg.events = deque(merged_events)
 

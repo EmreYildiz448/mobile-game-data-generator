@@ -6,7 +6,7 @@ from src import catalogs as C
 from src.settings import runtime as R
 
 class BusinessEventGenerator:
-    def __init__(self, shop_offers, chest_handler, event_handler, error_generator, analytics, seed=None):
+    def __init__(self, shop_offers, chest_handler, event_handler, error_generator, analytics):
         """
         Initialize the BusinessEventGenerator.
         """
@@ -15,9 +15,6 @@ class BusinessEventGenerator:
         self.event_handler = event_handler
         self.error_generator = error_generator
         self.analytics = analytics  # Initialize the AnalyticsFramework
-        self.seed = seed
-        if seed is not None:
-            random.seed(seed)
 
         # Track per-account offer refresh dates
         self.offer_refresh_dates = {}  # account_id -> {offer_name: last_purchase_date}
