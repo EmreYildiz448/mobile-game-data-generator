@@ -6,7 +6,7 @@ from src import catalogs as C
 from src.settings import runtime as R
 
 class BusinessEventGenerator:
-    def __init__(self, shop_offers, chest_handler, event_handler, error_generator, analytics):
+    def __init__(self, shop_offers, chest_handler, event_handler, error_generator):
         """
         Initialize the BusinessEventGenerator.
         """
@@ -14,7 +14,6 @@ class BusinessEventGenerator:
         self.chest_handler = chest_handler
         self.event_handler = event_handler
         self.error_generator = error_generator
-        self.analytics = analytics  # Initialize the AnalyticsFramework
 
         # Track per-account offer refresh dates
         self.offer_refresh_dates = {}  # account_id -> {offer_name: last_purchase_date}
@@ -158,9 +157,6 @@ class BusinessEventGenerator:
         # Apply both exchange rate and market-based adjustment
         adjusted_price = raw_cost * exchange_rate * market_multiplier * ab_monetization_effect
         cost_amount = round(adjusted_price, currency_rounding)
-
-        self.analytics.log_monetization(archetype_key)
-#        print("Monetization log:", self.analytics.monetization_by_archetype)
         
         # Generate business event
         business_event = emit(

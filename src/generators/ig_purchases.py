@@ -5,7 +5,7 @@ from src import catalogs as C
 from src.settings import runtime as R
 
 class InGamePurchaseGenerator:
-    def __init__(self, shop_offers, item_data, chest_handler, event_handler, error_generator, analytics):
+    def __init__(self, shop_offers, item_data, chest_handler, event_handler, error_generator):
         """
         Initialize the InGamePurchaseGenerator with shop offers, item data, an EventHandler instance, and an ErrorGenerator.
         """
@@ -14,7 +14,6 @@ class InGamePurchaseGenerator:
         self.chest_handler = chest_handler
         self.event_handler = event_handler
         self.error_generator = error_generator
-        self.analytics = analytics  # Initialize the AnalyticsFramework
 
     def filter_offers(self, account_state, account_map_data):
         """

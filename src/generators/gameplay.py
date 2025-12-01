@@ -7,7 +7,6 @@ from collections import defaultdict, deque
 from src import catalogs as C
 from src.settings import runtime as R
 from src.event_handler import EventHandler
-from src.analytics import AnalyticsFramework
 from src.generators.chest_handler import ChestHandler
 from src.generators.errors import ErrorGenerator
 from src.generators.ad_events import AdEventGenerator
@@ -43,16 +42,15 @@ class EventGenerator:
         self.error_data = error_data
         self.error_map = error_map
         self.item_success_contributions = C.item_success_contributions
-        self.analytics = AnalyticsFramework(max_days=R.ANALYTICS_MAX_DATERANGE)  # Initialize the AnalyticsFramework
         self.error_generator = ErrorGenerator(self.error_data, self.error_map, self.event_handler)
         self.chest_handler = ChestHandler(
             self.item_data, self.event_handler, self.error_generator)
         self.ad_event_generator = AdEventGenerator(
             self.ad_campaigns, self.event_handler, self.error_generator)
         self.business_event_generator = BusinessEventGenerator(
-            self.shop_offers, self.chest_handler, self.event_handler, self.error_generator, self.analytics)
+            self.shop_offers, self.chest_handler, self.event_handler, self.error_generator)
         self.in_game_purchase_generator = InGamePurchaseGenerator(
-            self.shop_offers, self.item_data, self.chest_handler, self.event_handler, self.error_generator, self.analytics)
+            self.shop_offers, self.item_data, self.chest_handler, self.event_handler, self.error_generator)
         self.events = deque()
         self.account_states = {}
         self.equipped_items = {}  # Store equipped items for accounts
@@ -888,7 +886,6 @@ class EventGenerator:
                     account_state["failure_streak"] = 0
                     current_level += 1
                     self.events.append(level_success_event)
-                    self.analytics.log_level_outcome(level_key, outcome=True)
             
                 base_timestamp += timedelta(seconds=1)
             
@@ -1023,7 +1020,6 @@ class EventGenerator:
                 
             else:  # Level Failed
 #                print(f"Player {account_id} failed level {level_key}. SC: {success_chance}, RS: {random_success}") # Debug code
-                self.analytics.log_level_outcome(level_key, outcome=False)
                 time_spent = level_cfg["time"]
                 fail_factor = round(random_success - success_chance, 4)
                 min_score = level_cfg["success_score_floor"] * R.FAIL_SCORE_MIN_FACTOR
@@ -1121,7 +1117,6 @@ class EventGenerator:
             base_timestamp += timedelta(seconds=random.randint(1, 3))
 
             if random.random() < self.calculate_shop_activity_probability(account_id):
-                self.analytics.log_shop_activity(archetype_key)
                 base_timestamp, purchase_events, terminate_session = self.in_game_purchase_generator.generate_in_game_purchase_event(
                     base_timestamp, account_state, account_data_ext, self.events, start_timestamp_fix, emit
                 )
@@ -1316,7 +1311,6 @@ class EventGenerator:
                 # Check if player is fully churned
                 if account_state["full_churn"] <= 0:
 #                    print(f"* CHURN EVENT: User {account_id} is churned out (RP: {round(retention_probability, 2)}, Check= {rp_check}, Loop count= {loop_count})")
-                    self.analytics.log_retention(day=current_day)
                     account_state["churned"] = "Churned"
                     self.update_final_account_state(account_id, account_state)
                     break
@@ -1393,9 +1387,8 @@ class EventGenerator:
     
         # Assign session IDs after all events are generated
         self.assign_session_ids()
-        summaries = self.analytics.generate_summary()
     
-        return self.get_events(), summaries
+        return self.get_events()
 
     def get_events(self):
         return self.events

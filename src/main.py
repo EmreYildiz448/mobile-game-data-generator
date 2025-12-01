@@ -46,8 +46,8 @@ def _worker_generate_events(chunk_accounts, worker_seed, hosted_ads, worker_id=N
         error_map=_error_map,
         worker_id=worker_id
     )
-    events, summaries = eg.generate_all_events()
-    return list(events), eg.get_final_account_states(), summaries
+    events = eg.generate_all_events()
+    return list(events), eg.get_final_account_states()
 
 def _delete_path(path: Path) -> None:
     """Delete a file or directory if it exists."""
@@ -198,7 +198,7 @@ def main():
             error_data=error_data,
             error_map=error_map
         )
-        events, _ = event_generator.generate_all_events() # _ -> summaries
+        events = event_generator.generate_all_events() 
         print(f"All events generated for a total of {len(events)} event rows")
         sessions = event_generator.generate_sessions()
     else:
@@ -215,7 +215,7 @@ def main():
         # Merge outputs
         merged_events = []
         merged_final_states = []
-        for ev_list, final_states, _summaries in results:
+        for ev_list, final_states in results:
             merged_events.extend(ev_list)
             merged_final_states.extend(final_states)
 
