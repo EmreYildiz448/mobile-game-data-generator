@@ -6,6 +6,8 @@ import os
 import multiprocessing as mp
 import random
 import numpy as np
+from pathlib import Path
+import shutil
 
 def chunkify(lst, n):
     k, m = divmod(len(lst), n)
@@ -47,6 +49,63 @@ def _worker_generate_events(chunk_accounts, worker_seed, hosted_ads, worker_id=N
     events, summaries = eg.generate_all_events()
     return list(events), eg.get_final_account_states(), summaries
 
+def _delete_path(path: Path) -> None:
+    """Delete a file or directory if it exists."""
+    if not path.exists():
+        return
+    if path.is_file():
+        path.unlink()
+    else:
+        shutil.rmtree(path)
+
+
+def _handle_existing_outputs_or_abort() -> None:
+    """
+    If ANY output artifacts exist:
+
+        - Ask user: Delete all existing output? (y/N)
+        - If "y" or "yes": delete everything and continue
+        - If "n" or "no": abort the program
+        - Any other input: repeat prompt until valid
+    """
+
+    data_dir      = Path(R.DATA_INT_DIR)
+    duckdb_path   = Path(R.DUCKDB_DIR)
+    ab_report_dir = Path(R.REPORT_AB_DIR)
+    ml_report_dir = Path(R.REPORT_ML_DIR)
+
+    paths = [data_dir, duckdb_path, ab_report_dir, ml_report_dir]
+    existing = [p for p in paths if p.exists()]
+
+    if not existing:
+        return  # No old artifacts
+
+    print("\n[existing output detected] The following outputs already exist:")
+    for p in existing:
+        print(f"  - {p}")
+
+    print("\nRunning the pipeline on top of existing files may corrupt results.")
+    print("You have two options:")
+    print("  - Delete all existing output and re-run clean")
+    print("  - Abort now and manually move/save the files")
+
+    # Validation loop
+    while True:
+        resp = input("\nDelete ALL existing output? [y/N]: ").strip().lower()
+
+        if resp in ("y", "yes"):
+            print("\nDeleting old outputs...")
+            for p in existing:
+                _delete_path(p)
+            print("Cleanup complete.\n")
+            return  # Continue execution normally
+
+        elif resp in ("n", "no", ""):
+            print("\nAborting without changes.")
+            raise SystemExit(1)
+
+        else:
+            print("Invalid input. Please answer 'y' or 'n'.")
 
 from src.settings import runtime as R
 from src.catalogs import ad_config_data, advertiser_config, error_data, error_map, event_master_dict, item_data, level_data, player_archetypes, shop_offers
@@ -66,6 +125,7 @@ from src.analysis.ab_test import run_ab_tests
 from src.analysis.ml_models import run_ml_suite
 
 def main():
+    _handle_existing_outputs_or_abort()
     random.seed(R.SEED)
     np.random.seed(R.SEED)
 
