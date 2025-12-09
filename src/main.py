@@ -9,6 +9,45 @@ import numpy as np
 from pathlib import Path
 import shutil
 
+from src.settings import runtime as R
+
+def _offer_duckdb_cli(aborted: bool = False) -> None:
+    """
+    Optionally launch the DuckDB CLI viewer if a DuckDB file exists.
+
+    aborted=False  -> normal completion message
+    aborted=True   -> message explains that generation was aborted but DB may exist
+    """
+    db_path = Path(R.DUCKDB_PATH)
+    if not db_path.exists():
+        # Nothing to explore
+        return
+
+    if aborted:
+        prompt = (
+            f"\nData generation was aborted, but a DuckDB file was found at:\n"
+            f"  {db_path}\n"
+            "Would you like to explore it now? [y/N]: "
+        )
+    else:
+        prompt = (
+            f"\nData generation is complete. DuckDB file is at:\n"
+            f"  {db_path}\n"
+            "Would you like to explore it now? [y/N]: "
+        )
+
+    while True:
+        resp = input(prompt).strip().lower()
+        if resp in ("y", "yes"):
+            from src.duckdb_cli import duckdb_cli_main
+            duckdb_cli_main()
+            return
+        elif resp in ("n", "no", ""):
+            print("Goodbye :)")
+            return
+        else:
+            print("Invalid input. Please answer 'y' or 'n'.")
+
 def chunkify(lst, n):
     k, m = divmod(len(lst), n)
     return [lst[i * k + min(i, m):(i + 1) * k + min(i + 1, m)] for i in range(n)]
@@ -101,13 +140,14 @@ def _handle_existing_outputs_or_abort() -> None:
             return  # Continue execution normally
 
         elif resp in ("n", "no", ""):
-            print("\nAborting without changes.")
-            raise SystemExit(1)
+            print("\nAborting data generation. Existing outputs were kept.")
+            # Optionally let the user explore any existing DuckDB file
+            _offer_duckdb_cli(aborted=True)
+            raise SystemExit(0)
 
         else:
             print("Invalid input. Please answer 'y' or 'n'.")
 
-from src.settings import runtime as R
 from src.catalogs import ad_config_data, advertiser_config, error_data, error_map, event_master_dict, item_data, level_data, player_archetypes, shop_offers
 from src.event_handler import EventHandler
 from src.generators.accounts import AccountsGenerator
@@ -339,7 +379,8 @@ def main():
         run_ab_tests(R.DUCKDB_PATH, R.REPORT_AB_DIR)
     if R.EXEC_ML_TESTS:
         run_ml_suite(R.DUCKDB_PATH, R.REPORT_ML_DIR, None)
-    print("Done")
+    print("Data generation process is completed.")
+    _offer_duckdb_cli(aborted=False)
 
 if __name__ == "__main__":
     try:
