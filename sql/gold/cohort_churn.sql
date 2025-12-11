@@ -1,4 +1,4 @@
-CREATE TABLE gold.cohort_churt AS
+CREATE TABLE gold.cohort_churn AS
  WITH latest_session_day AS (
          SELECT max(date(sessions.session_start)) AS max_day
            FROM bronze.sessions

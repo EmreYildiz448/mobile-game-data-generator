@@ -3,6 +3,7 @@
 import sys
 import re
 from pathlib import Path
+import matplotlib.pyplot as plt
 
 import duckdb
 import pandas as pd
@@ -260,7 +261,283 @@ def export_table_as_csv(con):
         print(f"[duckdb_cli] Error exporting table '{fq_name}': {e}\n")
 
 
+# ---------- Visualization helper functions ----------
+
+
+def _query_df(
+    con,
+    sql: str,
+    x_col: str | None = None,
+    parse_dates: bool = False,
+):
+    """Run SQL and return a DataFrame, optionally parsing a datetime x_col."""
+    df = con.execute(sql).df()
+    if df.empty:
+        print("[duckdb_cli] Query returned 0 rows; nothing to plot.\n")
+        return None
+
+    if parse_dates and x_col is not None:
+        df[x_col] = pd.to_datetime(df[x_col])
+
+    return df
+
+
+def _get_viz_output_path(filename: str) -> Path:
+    """Ensure the viz directory exists and return full output path."""
+    viz_dir = Path(R.REPORT_VIZ_DIR)
+    viz_dir.mkdir(parents=True, exist_ok=True)
+    return viz_dir / filename
+
+
+def _save_figure(fig, out_path: Path):
+    """Save a matplotlib figure and print a standard message."""
+    fig.savefig(out_path, bbox_inches="tight")
+    plt.close(fig)
+    print(f"[duckdb_cli] Saved chart to: {out_path}\n")
+
+
+def _set_title_and_labels(
+    ax,
+    title: str,
+    x_label: str | None,
+    y_label: str | None,
+    default_x: str,
+    default_y: str,
+):
+    """Centralized helper for setting title and axis labels."""
+    ax.set_title(title)
+    ax.set_xlabel(x_label or default_x)
+    ax.set_ylabel(y_label or default_y)
+
+def _line_chart_core(
+    con,
+    sql: str,
+    x_col: str,
+    series: list[tuple[str | None, str]],
+    title: str,
+    filename: str,
+    x_label: str | None = None,
+    y_label: str | None = None,
+    show_legend: bool = False,
+):
+    """
+    Internal core for both single-line and multi-line time series charts.
+
+    Parameters:
+        con     : duckdb connection
+        sql     : SQL query returning at least x_col + all y_cols
+        x_col   : name of datetime/date column (X axis)
+        series  : list of (label, column_name) for each line
+                  label can be None for unlabeled (single-line) plots
+        title   : plot title
+        filename: output PNG filename under R.REPORT_VIZ_DIR
+        x_label : optional custom X label (default = x_col)
+        y_label : optional custom Y label (default = 'Value')
+        show_legend : whether to show a legend (multi-line charts)
+    """
+    df = _query_df(con, sql, x_col=x_col, parse_dates=True)
+    if df is None:
+        return
+
+    out_path = _get_viz_output_path(filename)
+
+    fig, ax = plt.subplots(figsize=(16, 8))
+
+    for label, col in series:
+        if col not in df.columns:
+            print(
+                f"[duckdb_cli] Warning: column '{col}' not found in query result; "
+                f"skipping series '{label or col}'."
+            )
+            continue
+
+        if label is None:
+            ax.plot(df[x_col], df[col])
+        else:
+            ax.plot(df[x_col], df[col], label=label)
+
+    _set_title_and_labels(
+        ax,
+        title=title,
+        x_label=x_label,
+        y_label=y_label,
+        default_x=x_col,
+        default_y=y_label or "Value",
+    )
+
+    if show_legend:
+        ax.legend()
+
+    fig.autofmt_xdate()
+    _save_figure(fig, out_path)
+
+
+def bar_chart_from_sql(
+    con,
+    sql: str,
+    x_col: str,
+    y_col: str,
+    title: str,
+    filename: str,
+    x_label: str | None = None,
+    y_label: str | None = None,
+    rotate_xticks: bool = True,
+):
+    """
+    Simple bar chart from a SQL query.
+
+    Expects the query to return at least x_col and y_col.
+    """
+    df = _query_df(con, sql, x_col=None, parse_dates=False)
+    if df is None:
+        return
+
+    out_path = _get_viz_output_path(filename)
+
+    fig, ax = plt.subplots()
+    ax.bar(df[x_col], df[y_col])
+
+    _set_title_and_labels(
+        ax,
+        title=title,
+        x_label=x_label,
+        y_label=y_label,
+        default_x=x_col,
+        default_y=y_col,
+    )
+
+    if rotate_xticks:
+        plt.setp(ax.get_xticklabels(), rotation=45, ha="right")
+
+    fig.tight_layout()
+    _save_figure(fig, out_path)
+
+
+# ---------- Visualization functions ----------
+    
+
+def plot_daily_revenue(con):
+    sql = """
+        SELECT session_day, total_rev
+        FROM silver.session_metrics
+        ORDER BY session_day
+    """
+    _line_chart_core(
+        con=con,
+        sql=sql,
+        x_col="session_day",
+        series=[(None, "total_rev")],
+        title="Daily Revenue (silver.session_metrics)",
+        filename="daily_revenue_timeseries.png",
+        x_label="Date",
+        y_label="Total Revenue",
+        show_legend=False,
+    )
+
+
+def plot_daily_acquisition(con):
+    sql = """
+        SELECT date AS acq_day, SUM(daily_acquired_users) AS dau
+        FROM gold.acquisition_daily
+        GROUP BY date
+        ORDER BY date
+    """
+
+    _line_chart_core(
+        con=con,
+        sql=sql,
+        x_col="acq_day",
+        series=[(None, "dau")],  # single line → label = None
+        title="Daily Acquisition (gold.acquisition_daily)",
+        filename="daily_acquisition_timeseries.png",
+        x_label="Date",
+        y_label="Daily Acquired Users",
+        show_legend=False,
+    )
+
+
+def plot_daily_event_count(con):
+    sql = """
+        SELECT DATE(event_date) AS event_day, COUNT(*) AS events_count
+        FROM bronze.events
+        GROUP BY DATE(event_date)
+        ORDER BY DATE(event_date)
+    """
+
+    _line_chart_core(
+        con=con,
+        sql=sql,
+        x_col="event_day",
+        series=[(None, "events_count")],  # single line
+        title="Daily Event Count (bronze.events)",
+        filename="daily_event_count_timeseries.png",
+        x_label="Event Day",
+        y_label="Event Count",
+        show_legend=False,
+    )
+
+
+def plot_all_offers_daily_revenue(con):
+    sql = """
+        SELECT
+            event_date,
+            SUM(CASE WHEN offer_id = 'off_chest_legendary' THEN total_revenue ELSE 0 END) AS off_chest_legendary,
+            SUM(CASE WHEN offer_id = 'off_diamond_1500' THEN total_revenue ELSE 0 END) AS off_diamond_1500,
+            SUM(CASE WHEN offer_id = 'off_diamond_500' THEN total_revenue ELSE 0 END) AS off_diamond_500,
+            SUM(CASE WHEN offer_id = 'off_hero_bundle_battlemage' THEN total_revenue ELSE 0 END) AS off_hero_bundle_battlemage,
+            SUM(CASE WHEN offer_id = 'off_hero_bundle_deluxe_battlemage' THEN total_revenue ELSE 0 END) AS off_hero_bundle_deluxe_battlemage,
+            SUM(CASE WHEN offer_id = 'off_hero_bundle_deluxe_rogue' THEN total_revenue ELSE 0 END) AS off_hero_bundle_deluxe_rogue,
+            SUM(CASE WHEN offer_id = 'off_hero_bundle_deluxe_warrior' THEN total_revenue ELSE 0 END) AS off_hero_bundle_deluxe_warrior,
+            SUM(CASE WHEN offer_id = 'off_hero_bundle_rogue' THEN total_revenue ELSE 0 END) AS off_hero_bundle_rogue,
+            SUM(CASE WHEN offer_id = 'off_hero_bundle_warrior' THEN total_revenue ELSE 0 END) AS off_hero_bundle_warrior,
+            SUM(CASE WHEN offer_id = 'off_item_bundle_epic' THEN total_revenue ELSE 0 END) AS off_item_bundle_epic,
+            SUM(CASE WHEN offer_id = 'off_subscription_basic' THEN total_revenue ELSE 0 END) AS off_subscription_basic,
+            SUM(CASE WHEN offer_id = 'off_subscription_premium' THEN total_revenue ELSE 0 END) AS off_subscription_premium
+        FROM gold.biz_offer_performance
+        GROUP BY event_date
+        ORDER BY event_date
+    """
+
+    _line_chart_core(
+        con=con,
+        sql=sql,
+        x_col="event_date",
+        series=[
+            ("Legendary Chest",         "off_chest_legendary"),
+            ("Diamond 1500",            "off_diamond_1500"),
+            ("Diamond 500",             "off_diamond_500"),
+            ("Hero Bundle Battlemage",  "off_hero_bundle_battlemage"),
+            ("Deluxe Battlemage",       "off_hero_bundle_deluxe_battlemage"),
+            ("Deluxe Rogue",            "off_hero_bundle_deluxe_rogue"),
+            ("Deluxe Warrior",          "off_hero_bundle_deluxe_warrior"),
+            ("Hero Bundle Rogue",       "off_hero_bundle_rogue"),
+            ("Hero Bundle Warrior",     "off_hero_bundle_warrior"),
+            ("Item Bundle Epic",        "off_item_bundle_epic"),
+            ("Sub Basic",               "off_subscription_basic"),
+            ("Sub Premium",             "off_subscription_premium"),
+        ],
+        title="Daily Revenue by Offer (gold.biz_offer_performance)",
+        filename="offers_daily_revenue_multiline.png",
+        x_label="Date",
+        y_label="Total Revenue",
+        show_legend=True,
+    )
+
+
+def plot_ad_roas_bar_chart(con):
+    bar_chart_from_sql(
+        con,
+        sql= """SELECT ad_name, roas FROM gold.marketing_ad_metrics ORDER BY roas DESC""",
+        x_col="ad_name",
+        y_col="roas",
+        title="Ad ROAS (gold.marketing_ad_metrics)",
+        filename="ad_roas_bar_chart.png",
+        x_label="Ad Name",
+        y_label="ROAS"
+    )
+
 # ---------- Simple SQL safety / injection guard ----------
+
 
 FORBIDDEN_KEYWORDS = {
     "insert",
@@ -341,6 +618,7 @@ def run_custom_select(con):
 
 # ---------- Menu / entrypoint ----------
 
+
 def menu_loop(con):
     """Interactive menu loop for exploring the DuckDB file."""
     while True:
@@ -351,6 +629,7 @@ def menu_loop(con):
             "3) Show schema of a table\n"
             "4) Run a custom SELECT query\n"
             "5) Export a table as CSV\n"
+            "6) Produce visualizations from tables\n"
             "0) Quit\n"
         )
         choice = input("Select an option: ").strip()
@@ -365,11 +644,39 @@ def menu_loop(con):
             run_custom_select(con)
         elif choice == "5":
             export_table_as_csv(con)
+        elif choice == "6":
+            while True:
+                print(
+                    "\nVisualization Options:\n"
+                    "1) Daily Revenue\n"
+                    "2) Daily Acquisition\n"
+                    "3) Daily Event Count\n"
+                    "4) Daily Revenue by All Offers\n"
+                    "5) Ad ROAS Bar Chart\n"
+                    "0) Return to main menu\n"
+                )
+                viz_choice = input("Select a visualization to produce: ").strip()
+
+                if viz_choice == "1":
+                    plot_daily_revenue(con)
+                elif viz_choice == "2":
+                    plot_daily_acquisition(con)
+                elif viz_choice == "3":
+                    plot_daily_event_count(con)
+                elif viz_choice == "4":
+                    plot_all_offers_daily_revenue(con)
+                elif viz_choice == "5":
+                    plot_ad_roas_bar_chart(con)
+                elif viz_choice == "0":
+                    print("[duckdb_cli] Returning to DuckDB viewer menu...\n")
+                    break
+                else:
+                    print("[duckdb_cli] Invalid choice. Please select 0–3.\n")
         elif choice == "0":
             print("[duckdb_cli] Goodbye :)")
             break
         else:
-            print("[duckdb_cli] Invalid choice. Please select 0–5.\n")
+            print("[duckdb_cli] Invalid choice. Please select 0–6.\n")
 
 
 def duckdb_cli_main():

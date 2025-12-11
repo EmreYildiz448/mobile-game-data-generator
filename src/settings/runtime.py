@@ -109,6 +109,8 @@ SQL_ANLYT_DIR = SQL_DIR / "analytics"
 OUT_DIR = PROJECT_ROOT / "output"
 DUCKDB_DIR = OUT_DIR / "duckdb"
 REPORT_DIR = OUT_DIR / "reports"
+DUCKDB_EXPORT_DIR = PROJECT_ROOT / "duckdb_exports"
+REPORT_VIZ_DIR = DUCKDB_EXPORT_DIR / "report_viz"
 
 # --- Reporting layout ---
 REPORT_AB_DIR         = REPORT_DIR / "ab_test"
@@ -313,5 +315,3 @@ REFERRAL_REWARD_CHEST_ID = _s("REFERRAL_REWARD_CHEST_ID", "ch_epic")
 
 EXEC_STAT_TESTS = _b("EXEC_STAT_TESTS", True)
 EXEC_ML_TESTS = _b("EXEC_ML_TESTS", True)
-
-DUCKDB_EXPORT_DIR = _s("DUCKDB_EXPORT_DIR", PROJECT_ROOT / "duckdb_exports")
