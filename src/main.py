@@ -21,6 +21,8 @@ def _offer_duckdb_cli(aborted: bool = False) -> None:
     db_path = Path(R.DUCKDB_PATH)
     if not db_path.exists():
         # Nothing to explore
+        print("No DuckDB file found to explore. Quitting program...")
+        print("Goodbye :)")
         return
 
     if aborted:

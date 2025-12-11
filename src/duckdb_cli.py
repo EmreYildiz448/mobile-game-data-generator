@@ -7,8 +7,9 @@ import matplotlib.pyplot as plt
 
 import duckdb
 import pandas as pd
+from pandas.api.types import is_numeric_dtype, is_datetime64_any_dtype
 
-from src.settings import runtime as R  # uses R.DUCKDB_PATH
+from src.settings import runtime as R
 
 
 # ---------- Identifier escaping ----------
@@ -413,6 +414,147 @@ def bar_chart_from_sql(
     _save_figure(fig, out_path)
 
 
+def custom_visualization(con):
+    """
+    Let the user run a SELECT and turn the result into a simple chart.
+
+    Supports:
+      - Single-line time series (line chart)
+      - Simple bar chart
+
+    Uses existing helpers: _line_chart_core and bar_chart_from_sql.
+    """
+    print_tables(con)
+    print(
+        "Custom visualization from SELECT query.\n"
+        "- Only SELECT statements are allowed.\n"
+        "- Result must contain at least two columns (X and Y).\n"
+        "- For line charts, X should be a date/datetime column.\n"
+    )
+    sql = input("SQL> ").strip()
+    if not sql:
+        print("[duckdb_cli] Cancelled.\n")
+        return
+
+    if not is_safe_select(sql):
+        print(
+            "[duckdb_cli] Query rejected by safety checks.\n"
+            "Only simple SELECT queries without DDL/DML/admin keywords are allowed.\n"
+        )
+        return
+
+    # Run once to inspect the result
+    try:
+        df = con.execute(sql).df()
+    except Exception as e:
+        print(f"[duckdb_cli] Error executing query: {e}\n")
+        return
+
+    if df.empty:
+        print("[duckdb_cli] Query returned 0 rows; nothing to visualize.\n")
+        return
+
+    print_dataframe(df.head(10), max_rows=10)
+    print("Columns in result:")
+    print("  " + ", ".join(df.columns))
+    print()
+
+    # Choose visualization type
+    while True:
+        print(
+            "Visualization type:\n"
+            "  1) Single-line time series (line chart)\n"
+            "  2) Bar chart\n"
+            "  0) Cancel\n"
+        )
+        vtype = input("Choose visualization type: ").strip()
+        if vtype in {"0", "1", "2"}:
+            break
+        print("[duckdb_cli] Invalid choice; please select 0, 1, or 2.\n")
+
+    if vtype == "0":
+        print("[duckdb_cli] Cancelled.\n")
+        return
+
+    # Pick X column
+    x_col = input("Enter X axis column name: ").strip()
+    if x_col not in df.columns:
+        print(f"[duckdb_cli] Column '{x_col}' not found; cancelling.\n")
+        return
+
+    # Pick Y column
+    y_col = input("Enter Y axis column name: ").strip()
+    if y_col not in df.columns:
+        print(f"[duckdb_cli] Column '{y_col}' not found; cancelling.\n")
+        return
+
+    # Basic type checks
+    if vtype == "1":  # line chart: X should be date-like, Y numeric
+        # Try to see if X is already datetime / date, or convertible
+        if not is_datetime64_any_dtype(df[x_col]):
+            try:
+                pd.to_datetime(df[x_col])
+            except Exception:
+                print(
+                    f"[duckdb_cli] Column '{x_col}' does not look like a date/datetime "
+                    "and cannot be parsed; line chart cancelled.\n"
+                )
+                return
+
+        if not is_numeric_dtype(df[y_col]):
+            print(
+                f"[duckdb_cli] Column '{y_col}' is not numeric; "
+                "line chart requires numeric Y.\n"
+            )
+            return
+
+    elif vtype == "2":  # bar chart: Y should be numeric
+        if not is_numeric_dtype(df[y_col]):
+            print(
+                f"[duckdb_cli] Column '{y_col}' is not numeric; "
+                "bar chart requires numeric Y.\n"
+            )
+            return
+
+    # Title & filename
+    default_title = f"{y_col} vs {x_col}"
+    title = input(f"Plot title [{default_title}]: ").strip() or default_title
+
+    default_fname_base = f"custom_{'line' if vtype=='1' else 'bar'}_{y_col}"
+    fname_base = (
+        input(f"Output filename (without .png) [{default_fname_base}]: ").strip()
+        or default_fname_base
+    )
+    # very basic sanitization
+    safe_base = re.sub(r"[^A-Za-z0-9_.-]+", "_", fname_base)
+    filename = safe_base + ".png"
+
+    # Actually create the chart using existing helpers
+    if vtype == "1":
+        _line_chart_core(
+            con=con,
+            sql=sql,
+            x_col=x_col,
+            series=[(None, y_col)],
+            title=title,
+            filename=filename,
+            x_label=x_col,
+            y_label=y_col,
+            show_legend=False,
+        )
+    else:  # vtype == "2" → bar
+        bar_chart_from_sql(
+            con=con,
+            sql=sql,
+            x_col=x_col,
+            y_col=y_col,
+            title=title,
+            filename=filename,
+            x_label=x_col,
+            y_label=y_col,
+        )
+
+
 # ---------- Visualization functions ----------
     
 
@@ -594,7 +736,7 @@ def run_custom_select(con):
     print(
         "Enter a SELECT query to run against this database.\n"
         "- Only SELECT statements are allowed.\n"
-        "- Dangerous keywords (DROP, DELETE, etc.) are blocked.\n"
+        "- Data manipulation (DROP, DELETE, etc.) is blocked.\n"
         "- Multiple statements (using ';') are not allowed.\n"
     )
     sql = input("SQL> ").strip()
@@ -629,7 +771,7 @@ def menu_loop(con):
             "3) Show schema of a table\n"
             "4) Run a custom SELECT query\n"
             "5) Export a table as CSV\n"
-            "6) Produce visualizations from tables\n"
+            "6) Create and export visualizations\n"
             "0) Quit\n"
         )
         choice = input("Select an option: ").strip()
@@ -653,6 +795,7 @@ def menu_loop(con):
                     "3) Daily Event Count\n"
                     "4) Daily Revenue by All Offers\n"
                     "5) Ad ROAS Bar Chart\n"
+                    "6) Custom visualization from SELECT query\n"
                     "0) Return to main menu\n"
                 )
                 viz_choice = input("Select a visualization to produce: ").strip()
@@ -667,11 +810,14 @@ def menu_loop(con):
                     plot_all_offers_daily_revenue(con)
                 elif viz_choice == "5":
                     plot_ad_roas_bar_chart(con)
+                elif viz_choice == "6":
+                    custom_visualization(con)
                 elif viz_choice == "0":
                     print("[duckdb_cli] Returning to DuckDB viewer menu...\n")
                     break
                 else:
-                    print("[duckdb_cli] Invalid choice. Please select 0–3.\n")
+                    print("[duckdb_cli] Invalid choice. Please select 0–6.\n")
+
         elif choice == "0":
             print("[duckdb_cli] Goodbye :)")
             break
