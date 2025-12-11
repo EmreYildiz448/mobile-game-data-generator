@@ -34,3 +34,4 @@ Thumbs.db
 
 # DuckDB exports
 duckdb_exports/
+duckdb_exports/**
