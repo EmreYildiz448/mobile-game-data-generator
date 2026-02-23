@@ -4,6 +4,9 @@ from pathlib import Path
 
 from dotenv import load_dotenv, dotenv_values
 
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+ENV_PATH = PROJECT_ROOT / ".env"
+
 def _prevalidate_env(path: str | None = None) -> bool:
     """
     Read .env as simple key-value pairs, validate critical relationships.
@@ -94,11 +97,9 @@ def _apply_env_with_validation(path: str | None = None) -> None:
 
 
 # Apply env once when runtime.py is first imported in this process
-_apply_env_with_validation()
+_apply_env_with_validation(str(ENV_PATH))
 
 
-
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DATA_DIR = PROJECT_ROOT / "data"
 DATA_EXT_DIR = DATA_DIR / "external"
 DATA_INT_DIR = DATA_DIR / "interim"
