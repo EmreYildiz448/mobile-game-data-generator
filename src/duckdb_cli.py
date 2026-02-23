@@ -41,23 +41,23 @@ MAX_COLWIDTH_DEFAULT = 30  # tweak this if you want wider/narrower columns
 
 
 def _truncate_df_strings(df: pd.DataFrame, max_colwidth: int) -> pd.DataFrame:
-    """Return a copy where all string cells are truncated to max_colwidth with '...'."""
+    """Return a copy where all string-like cells are truncated to max_colwidth with '...'."""
     if max_colwidth is None:
         return df
 
     df_trunc = df.copy()
+
     for col in df_trunc.columns:
-        # Treat object dtype (mixed/strings) as truncate-able
+        # Only bother for object-like columns (mixed / strings)
         if df_trunc[col].dtype == "object":
-            df_trunc[col] = (
-                df_trunc[col]
-                .astype(str)
-                .map(
-                    lambda s: (s[: max_colwidth - 3] + "...")
-                    if len(s) > max_colwidth
-                    else s
+            df_trunc[col] = df_trunc[col].map(
+                lambda v: (
+                    (str(v)[: max_colwidth - 3] + "...")
+                    if len(str(v)) > max_colwidth
+                    else str(v)
                 )
             )
+
     return df_trunc
 
 
