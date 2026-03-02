@@ -15,7 +15,8 @@ These dashboards analyze key mobile-game performance domains:
 - **Ad Revenue & UA Metrics**
 
 All dashboards visualize data created using the open-source generator available here:
-GitHub Repository: [mobile-game-data-generator](https://github.com/EmreYildiz448/mobile-game-data-generator)
+
+**GitHub Repository:** [mobile-game-data-generator](https://github.com/EmreYildiz448/mobile-game-data-generator)
 
 
 ## Dashboard Index
